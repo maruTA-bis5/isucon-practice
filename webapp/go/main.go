@@ -1009,13 +1009,13 @@ func (cs Coordinates) coordinatesToText() string {
 // DB Accessors
 
 func txQueryRowx(tx *sqlx.Tx, context echo.Context, query string, args ...interface{}) *sqlx.Row {
-	return tx.QueryRowxContext(context.Request().Context(), query, args)
+	return tx.QueryRowxContext(context.Request().Context(), query, args...)
 }
 
 func txExec(tx *sql.Tx, context echo.Context, query string, args ...interface{}) (sql.Result, error) {
-	return tx.ExecContext(context.Request().Context(), query, args)
+	return tx.ExecContext(context.Request().Context(), query, args...)
 }
 
 func dbGet(db *sqlx.DB, context echo.Context, dest interface{}, query string, args ...interface{}) error {
-	return db.GetContext(context.Request().Context(), dest, query, args)
+	return db.GetContext(context.Request().Context(), dest, query, args...)
 }
