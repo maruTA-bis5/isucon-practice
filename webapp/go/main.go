@@ -13,11 +13,13 @@ import (
 	"strconv"
 	"strings"
 
-	_ "github.com/go-sql-driver/mysql"
 	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo"
 	"github.com/labstack/echo/middleware"
 	"github.com/labstack/gommon/log"
+	"github.com/newrelic/go-agent/v3/integrations/nrecho-v3"
+	_ "github.com/newrelic/go-agent/v3/integrations/nrmysql"
+	"github.com/newrelic/go-agent/v3/newrelic"
 )
 
 const Limit = 20
@@ -219,7 +221,7 @@ func getEnv(key, defaultValue string) string {
 //ConnectDB isuumoデータベースに接続する
 func (mc *MySQLConnectionEnv) ConnectDB() (*sqlx.DB, error) {
 	dsn := fmt.Sprintf("%v:%v@tcp(%v:%v)/%v", mc.User, mc.Password, mc.Host, mc.Port, mc.DBName)
-	return sqlx.Open("mysql", dsn)
+	return sqlx.Open("nrmysql", dsn)
 }
 
 func init() {
@@ -238,6 +240,21 @@ func init() {
 	json.Unmarshal(jsonText, &estateSearchCondition)
 }
 
+func initNewRelicApp(licenseKey string) *newrelic.Application {
+	app, err := newrelic.NewApplication(
+		newrelic.ConfigAppName("isuumo"),
+		newrelic.ConfigLicense(licenseKey),
+		newrelic.ConfigDebugLogger(os.Stdout),
+		func(cfg *newrelic.Config) {
+			cfg.CustomInsightsEvents.Enabled = true
+		},
+	)
+	if err != nil {
+		panic(err)
+	}
+	return app
+}
+
 func main() {
 	// Echo instance
 	e := echo.New()
@@ -246,6 +263,13 @@ func main() {
 		e.Logger.SetLevel(log.DEBUG)
 	} else {
 		e.Logger.SetLevel(log.ERROR)
+	}
+
+	// NewRelic
+	nrLicense := os.Getenv("NEWRELIC_LICENSE_KEY")
+	if nrLicense != "" {
+		nrApp := initNewRelicApp(nrLicense)
+		e.Use(nrecho.Middleware(nrApp))
 	}
 
 	// Middleware
