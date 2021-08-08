@@ -241,8 +241,12 @@ func init() {
 func main() {
 	// Echo instance
 	e := echo.New()
-	e.Debug = true
-	e.Logger.SetLevel(log.DEBUG)
+	e.Debug = os.Getenv("DEBUG") != ""
+	if e.Debug {
+		e.Logger.SetLevel(log.DEBUG)
+	} else {
+		e.Logger.SetLevel(log.ERROR)
+	}
 
 	// Middleware
 	e.Use(middleware.Logger())
