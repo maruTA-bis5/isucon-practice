@@ -51,7 +51,6 @@ type Chair struct {
 	Kind        string `db:"kind" json:"kind"`
 	Popularity  int64  `db:"popularity" json:"-"`
 	Stock       int64  `db:"stock" json:"-"`
-	HasStock    bool   `db:"has_stock" json:"-"`
 }
 
 type ChairSearchResponse struct {
@@ -431,7 +430,6 @@ func postChair(c echo.Context) error {
 			Kind:        kind,
 			Popularity:  int64(popularity),
 			Stock:       int64(stock),
-			HasStock:    stock > 0,
 		}
 		chairs = append(chairs, chair)
 	}
@@ -1033,11 +1031,11 @@ func txExec(tx *sql.Tx, context echo.Context, query string, args ...interface{})
 }
 
 func dbGet(db *sqlx.DB, context echo.Context, dest interface{}, query string, args ...interface{}) error {
-	return db.GetContext(context.Request().Context(), dest, query, args...)
+	return db.Unsafe().GetContext(context.Request().Context(), dest, query, args...)
 }
 
 func dbSelect(db *sqlx.DB, context echo.Context, dest interface{}, query string, args ...interface{}) error {
-	return db.SelectContext(context.Request().Context(), dest, query, args...)
+	return db.Unsafe().SelectContext(context.Request().Context(), dest, query, args...)
 }
 
 func dbNamedExec(db *sqlx.DB, context echo.Context, query string, args interface{}) (sql.Result, error) {
