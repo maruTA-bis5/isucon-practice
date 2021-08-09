@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/goccy/go-json"
+	"github.com/kaboc/sqlp"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo"
@@ -27,6 +28,7 @@ const Limit = 20
 const NazotteLimit = 50
 
 var db *sqlx.DB
+var pdb *sqlp.DB
 var mySQLConnectionData *MySQLConnectionEnv
 var chairSearchCondition ChairSearchCondition
 var estateSearchCondition EstateSearchCondition
@@ -306,6 +308,7 @@ func main() {
 	if err != nil {
 		e.Logger.Fatalf("DB connection failed : %v", err)
 	}
+	pdb = sqlp.Init(db.DB)
 	db.SetMaxOpenConns(10)
 	defer db.Close()
 
@@ -433,7 +436,7 @@ func postChair(c echo.Context) error {
 		chairs = append(chairs, chair)
 	}
 	if len(chairs) != 0 {
-		_, err := dbNamedExec(db, c, "INSERT INTO chair(id, name, description, thumbnail, price, height, width, depth, color, features, kind, popularity, stock, has_stock) VALUES(:id, :name, :description, :thumbnail, :price, :height, :width, :depth, :color, :features, :kind, :popularity, :stock, DEFAULT)", chairs)
+		_, err := pdb.InsertContext(c.Request().Context(), "chair", chairs)
 		if err != nil {
 			c.Logger().Errorf("failed to insert chair: %v", err)
 			return c.NoContent(http.StatusInternalServerError)
