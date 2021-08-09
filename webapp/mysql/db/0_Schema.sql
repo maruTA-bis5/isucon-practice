@@ -21,6 +21,8 @@ CREATE TABLE isuumo.estate
     location    POINT AS (POINT(latitude, longitude)) STORED NOT NULL SRID 0,
     INDEX (popularity DESC),
     INDEX (rent),
+    INDEX (door_width),
+    INDEX (door_height),
     SPATIAL INDEX (location)
 );
 
