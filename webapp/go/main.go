@@ -244,7 +244,7 @@ func init() {
 
 func initNewRelicApp(licenseKey string) *newrelic.Application {
 	app, err := newrelic.NewApplication(
-		newrelic.ConfigAppName("isuumo"),
+		newrelic.ConfigAppName(getEnv("NEWRELIC_APP_NAME", "isuumo")),
 		newrelic.ConfigLicense(licenseKey),
 		newrelic.ConfigDebugLogger(os.Stdout),
 		func(cfg *newrelic.Config) {
@@ -268,7 +268,7 @@ func main() {
 	}
 
 	// NewRelic
-	nrLicense := os.Getenv("NEWRELIC_LICENSE_KEY")
+	nrLicense := getEnv("NEWRELIC_LICENSE_KEY", "")
 	if nrLicense != "" {
 		nrApp := initNewRelicApp(nrLicense)
 		e.Use(nrecho.Middleware(nrApp))
