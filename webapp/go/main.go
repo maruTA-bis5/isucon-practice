@@ -1023,7 +1023,7 @@ func (cs Coordinates) coordinatesToText() string {
 // DB Accessors
 
 func txQueryRowx(tx *sqlx.Tx, context echo.Context, query string, args ...interface{}) *sqlx.Row {
-	return tx.QueryRowxContext(context.Request().Context(), query, args...)
+	return tx.Unsafe().QueryRowxContext(context.Request().Context(), query, args...)
 }
 
 func txExec(tx *sql.Tx, context echo.Context, query string, args ...interface{}) (sql.Result, error) {
