@@ -835,7 +835,7 @@ func searchEstates(c echo.Context) error {
 
 	res.Estates = estates
 
-	return c.JSON(http.StatusOK, res)
+	return responseJson(c, http.StatusOK, res)
 }
 
 func getLowPricedEstate(c echo.Context) error {
