@@ -428,6 +428,7 @@ func postChair(c echo.Context) error {
 			Kind:        kind,
 			Popularity:  int64(popularity),
 			Stock:       int64(stock),
+			HasStock:    stock > 0,
 		}
 		chairs = append(chairs, chair)
 	}
@@ -1037,5 +1038,9 @@ func dbSelect(db *sqlx.DB, context echo.Context, dest interface{}, query string,
 }
 
 func dbNamedExec(db *sqlx.DB, context echo.Context, query string, args interface{}) (sql.Result, error) {
-	return db.NamedExecContext(context.Request().Context(), query, args)
+	query, arg, err := sqlx.Named(query, args)
+	if err != nil {
+		return nil, err
+	}
+	return db.NamedExecContext(context.Request().Context(), query, arg)
 }
