@@ -334,6 +334,7 @@ func initialize(c echo.Context) error {
 		if out, err := exec.Command("bash", "-c", cmdStr).Output(); err != nil {
 			c.Logger().Errorf("Initialize script error : %v", err)
 			c.Logger().Errorf("output: %v", out)
+			c.Logger().Errorf("file: %v", sqlFile)
 			return c.NoContent(http.StatusInternalServerError)
 		}
 	}
