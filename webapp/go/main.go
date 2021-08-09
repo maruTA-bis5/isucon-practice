@@ -394,6 +394,7 @@ func postChair(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 	defer tx.Rollback()
+	var chairs []Chair
 	for _, row := range records {
 		rm := RecordMapper{Record: row}
 		id := rm.NextInt()
@@ -413,7 +414,25 @@ func postChair(c echo.Context) error {
 			c.Logger().Errorf("failed to read record: %v", err)
 			return c.NoContent(http.StatusBadRequest)
 		}
-		_, err := txExec(tx, c, "INSERT INTO chair(id, name, description, thumbnail, price, height, width, depth, color, features, kind, popularity, stock, has_stock) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?, DEFAULT)", id, name, description, thumbnail, price, height, width, depth, color, features, kind, popularity, stock)
+		chair := Chair{
+			ID:          int64(id),
+			Name:        name,
+			Description: description,
+			Thumbnail:   thumbnail,
+			Price:       int64(price),
+			Height:      int64(height),
+			Width:       int64(width),
+			Depth:       int64(depth),
+			Color:       color,
+			Features:    features,
+			Kind:        kind,
+			Popularity:  int64(popularity),
+			Stock:       int64(stock),
+		}
+		chairs = append(chairs, chair)
+	}
+	if len(chairs) != 0 {
+		_, err := dbNamedExec(db, c, "INSERT INTO chair(id, name, description, thumbnail, price, height, width, depth, color, features, kind, popularity, stock, has_stock) VALUES(:id, :name, :description, :thumbnail, :price, :height, :width, :depth, :color, :features, :kind, :popularity, :stock, DEFAULT)", chairs)
 		if err != nil {
 			c.Logger().Errorf("failed to insert chair: %v", err)
 			return c.NoContent(http.StatusInternalServerError)
@@ -1015,4 +1034,8 @@ func dbGet(db *sqlx.DB, context echo.Context, dest interface{}, query string, ar
 
 func dbSelect(db *sqlx.DB, context echo.Context, dest interface{}, query string, args ...interface{}) error {
 	return db.SelectContext(context.Request().Context(), dest, query, args...)
+}
+
+func dbNamedExec(db *sqlx.DB, context echo.Context, query string, args interface{}) (sql.Result, error) {
+	return db.NamedExecContext(context.Request().Context(), query, args)
 }
