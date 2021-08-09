@@ -331,8 +331,9 @@ func initialize(c echo.Context) error {
 			mySQLConnectionData.DBName,
 			sqlFile,
 		)
-		if err := exec.Command("bash", "-c", cmdStr).Run(); err != nil {
+		if out, err := exec.Command("bash", "-c", cmdStr).Output(); err != nil {
 			c.Logger().Errorf("Initialize script error : %v", err)
+			c.Logger().Errorf("output: %v", out)
 			return c.NoContent(http.StatusInternalServerError)
 		}
 	}
