@@ -72,8 +72,8 @@ type Estate struct {
 	Longitude   float64 `db:"longitude" json:"longitude"`
 	Address     string  `db:"address" json:"address"`
 	Rent        int64   `db:"rent" json:"rent"`
-	DoorHeight  int64   `db:"door_height" json:"doorHeight"`
-	DoorWidth   int64   `db:"door_width" json:"doorWidth"`
+	DoorHeight  int64   `db:"door_height" json:"doorHeight" col:"door_height"`
+	DoorWidth   int64   `db:"door_width" json:"doorWidth" col:"door_width"`
 	Features    string  `db:"features" json:"features"`
 	Popularity  int64   `db:"popularity" json:"-"`
 }
