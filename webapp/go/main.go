@@ -367,7 +367,7 @@ func getChairDetail(c echo.Context) error {
 		return c.NoContent(http.StatusNotFound)
 	}
 
-	return c.JSON(http.StatusOK, chair)
+	return responseJson(c, http.StatusOK, chair)
 }
 
 func postChair(c echo.Context) error {
@@ -660,7 +660,7 @@ func getEstateDetail(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
-	return c.JSON(http.StatusOK, estate)
+	return responseJson(c, http.StatusOK, estate)
 }
 
 func getRange(cond RangeCondition, rangeID string) (*Range, error) {
