@@ -3,7 +3,6 @@ package main
 import (
 	"database/sql"
 	"encoding/csv"
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -12,6 +11,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/goccy/go-json"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo"
@@ -558,7 +559,15 @@ func searchChairs(c echo.Context) error {
 
 	res.Chairs = chairs
 
-	return c.JSON(http.StatusOK, res)
+	return responseJson(c, http.StatusOK, res)
+}
+
+func responseJson(c echo.Context, status int, body interface{}) error {
+	writer := c.Response().Writer
+	enc := json.NewEncoder(writer)
+	c.Response().Header().Set(echo.HeaderContentType, echo.MIMEApplicationJSONCharsetUTF8)
+	c.Response().WriteHeader(status)
+	return enc.Encode(body)
 }
 
 func buyChair(c echo.Context) error {
