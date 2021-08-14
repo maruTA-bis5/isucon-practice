@@ -463,6 +463,8 @@ func schedulesHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var scheduleIds []string
+	scheduleById := make(map[string]*Schedule)
 	for rows.Next() {
 		schedule := &Schedule{}
 		if err := rows.StructScan(schedule); err != nil {
@@ -474,9 +476,41 @@ func schedulesHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		schedules = append(schedules, schedule)
+		scheduleById[schedule.ID] = schedule
+	}
+	reservationsBySchedule, err := bulkLoadReservationsCount(r, scheduleIds)
+	if err != nil {
+		sendErrorJSON(w, err, 500)
+		return
+	}
+	for id, count := range reservationsBySchedule {
+		scheduleById[id].Reserved = int(count)
 	}
 
 	sendJSON(w, schedules, 200)
+}
+
+func bulkLoadReservationsCount(r *http.Request, scheduleIds []string) (map[string]int64, error) {
+	query, args, err := sqlx.In("SELECT schedule_id, Count(schedule_id) c FROM reservations WHERE schedule_id IN (?) GROUP BY schedule_id", scheduleIds)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := db.QueryContext(r.Context(), query, args...)
+	if err != nil {
+		return nil, err
+	}
+	countById := make(map[string]int64)
+	for rows.Next() {
+		var r struct {
+			ID    string `db:"schedule_id"`
+			Count int64  `db:"c"`
+		}
+		if err := rows.Scan(&r); err != nil {
+			return nil, err
+		}
+		countById[r.ID] = r.Count
+	}
+	return countById, nil
 }
 
 func scheduleHandler(w http.ResponseWriter, r *http.Request) {
