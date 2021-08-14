@@ -436,7 +436,7 @@ func createReservationHandler(w http.ResponseWriter, r *http.Request) {
 		defer scheduleMutexContainer.Unlock(scheduleID)
 
 		var schedule *Schedule
-		tx.QueryRowContext(ctx, "SELECT id, capacity FROM `schedules` WHERE `id` = ? LIMIT 1 FOR UPDATE", scheduleID).Scan(schedule)
+		tx.QueryRowContext(ctx, "SELECT * FROM `schedules` WHERE `id` = ? LIMIT 1 FOR UPDATE", scheduleID).Scan(schedule)
 		if schedule != nil {
 			return sendErrorJSON(w, fmt.Errorf("schedule not found"), 403)
 		}
