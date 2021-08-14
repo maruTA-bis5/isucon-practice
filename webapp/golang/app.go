@@ -105,7 +105,7 @@ func getReservations(r *http.Request, s *Schedule) error {
 		reserved++
 	}
 
-	userById, err := bulkLoadUsers(r.Context(), userIds)
+	userById, err := bulkLoadUsers(r, userIds)
 	if err != nil {
 		return err
 	}
@@ -118,7 +118,8 @@ func getReservations(r *http.Request, s *Schedule) error {
 	return nil
 }
 
-func bulkLoadUsers(c context.Context, userIds []string) (map[string]User, error) {
+func bulkLoadUsers(r *http.Request, userIds []string) (map[string]User, error) {
+	c := r.Context()
 	if len(userIds) == 0 {
 		return make(map[string]User), nil
 	}
@@ -133,10 +134,11 @@ func bulkLoadUsers(c context.Context, userIds []string) (map[string]User, error)
 	}
 	userById := make(map[string]User)
 
+	currentUser := getCurrentUser(r)
 	for _, u := range users {
 		id := u.ID
-		// FIXME current userはクリアしない
-		if !u.Staff {
+
+		if (currentUser != nil && currentUser.ID == u.ID) || !u.Staff {
 			u.Email = ""
 		}
 		userById[id] = u
