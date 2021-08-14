@@ -537,14 +537,12 @@ func bulkLoadReservationsCount(r *http.Request, scheduleIds []string) (map[strin
 	}
 	countById := make(map[string]int64)
 	for rows.Next() {
-		var r struct {
-			ID    string `db:"schedule_id"`
-			Count int64  `db:"c"`
-		}
-		if err := rows.Scan(&r); err != nil {
+		var id string
+		var count int64
+		if err := rows.Scan(&id, &count); err != nil {
 			return nil, err
 		}
-		countById[r.ID] = r.Count
+		countById[id] = count
 	}
 	return countById, nil
 }
