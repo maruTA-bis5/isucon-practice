@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/goccy/go-json"
@@ -382,6 +383,39 @@ func createScheduleHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+var scheduleMutexContainer *ScheduleMutexContainer = &ScheduleMutexContainer{}
+
+type ScheduleMutexContainer struct {
+	mutexes map[string]*sync.Mutex
+	mapLock sync.RWMutex
+}
+
+func (c *ScheduleMutexContainer) Lock(scheduleID string) {
+	c.mapLock.Lock()
+	defer c.mapLock.Unlock()
+
+	scheduleLock := c.mutexes[scheduleID]
+	if scheduleLock == nil {
+		c.mutexes[scheduleID] = &sync.Mutex{}
+	}
+	c.mapLock.Unlock()
+
+	scheduleLock.Lock()
+}
+
+func (c *ScheduleMutexContainer) Unlock(scheduleID string) {
+	c.mapLock.RLock()
+	defer c.mapLock.RUnlock()
+
+	scheduleLock := c.mutexes[scheduleID]
+	if scheduleLock == nil {
+		return
+	}
+	c.mapLock.RUnlock()
+
+	scheduleLock.Unlock()
+}
+
 func createReservationHandler(w http.ResponseWriter, r *http.Request) {
 	if err := parseForm(r); err != nil {
 		sendErrorJSON(w, err, 500)
@@ -398,13 +432,16 @@ func createReservationHandler(w http.ResponseWriter, r *http.Request) {
 		scheduleID := r.PostFormValue("schedule_id")
 		userID := getCurrentUser(r).ID
 
-		found := 0
-		tx.QueryRowContext(ctx, "SELECT 1 FROM `schedules` WHERE `id` = ? LIMIT 1 FOR UPDATE", scheduleID).Scan(&found)
-		if found != 1 {
+		scheduleMutexContainer.Lock(scheduleID)
+		defer scheduleMutexContainer.Unlock(scheduleID)
+
+		var schedule *Schedule
+		tx.QueryRowContext(ctx, "SELECT id, capacity FROM `schedules` WHERE `id` = ? LIMIT 1 FOR UPDATE", scheduleID).Scan(schedule)
+		if schedule != nil {
 			return sendErrorJSON(w, fmt.Errorf("schedule not found"), 403)
 		}
 
-		found = 0
+		found := 0
 		tx.QueryRowContext(ctx, "SELECT 1 FROM `users` WHERE `id` = ? LIMIT 1", userID).Scan(&found)
 		if found != 1 {
 			return sendErrorJSON(w, fmt.Errorf("user not found"), 403)
@@ -416,18 +453,13 @@ func createReservationHandler(w http.ResponseWriter, r *http.Request) {
 			return sendErrorJSON(w, fmt.Errorf("already taken"), 403)
 		}
 
-		capacity := 0
-		if err := tx.QueryRowContext(ctx, "SELECT `capacity` FROM `schedules` WHERE `id` = ? LIMIT 1", scheduleID).Scan(&capacity); err != nil {
-			return sendErrorJSON(w, err, 500)
-		}
-
 		var reserved int
 		err := tx.GetContext(ctx, &reserved, "SELECT Count(*) FROM `reservations` WHERE `schedule_id` = ?", scheduleID)
 		if err != nil && err != sql.ErrNoRows {
 			return sendErrorJSON(w, err, 500)
 		}
 
-		if reserved >= capacity {
+		if reserved >= schedule.Capacity {
 			return sendErrorJSON(w, fmt.Errorf("capacity is already full"), 403)
 		}
 
