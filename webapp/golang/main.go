@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+
+	"github.com/newrelic/go-agent/v3/newrelic"
 )
 
 var (
@@ -20,9 +23,25 @@ func init() {
 }
 
 func main() {
+	nrLicense := os.Getenv("NEWRELIC_LICENSE")
+	var nrApp *newrelic.Application
+	var err error
+	if nrLicense != "" {
+		nrApp, err = newrelic.NewApplication(
+			newrelic.ConfigAppName("i11p"),
+			newrelic.ConfigLicense(nrLicense),
+			newrelic.ConfigDebugLogger(os.Stdout),
+			func(cfg *newrelic.Config) {
+				cfg.CustomInsightsEvents.Enabled = true
+			},
+		)
+		if err != nil {
+			panic(err)
+		}
+	}
 	srv := &http.Server{
 		Addr:    fmt.Sprintf("%s:%d", bind, port),
-		Handler: serveMux(),
+		Handler: serveMux(nrApp),
 	}
 
 	if err := srv.ListenAndServe(); err != nil {
