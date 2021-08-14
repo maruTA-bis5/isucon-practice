@@ -233,6 +233,10 @@ func sendJSON(w http.ResponseWriter, data interface{}, statusCode int) error {
 func sendErrorJSON(w http.ResponseWriter, err error, statusCode int) error {
 	log.Printf("ERROR: %+v", err)
 
+	return sendErrorJSONWithoutLog(w, err, statusCode)
+}
+
+func sendErrorJSONWithoutLog(w http.ResponseWriter, err error, statusCode int) error {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(statusCode)
 
@@ -308,7 +312,7 @@ func signupHandler(w http.ResponseWriter, r *http.Request) {
 	})
 
 	if err != nil {
-		sendErrorJSON(w, err, 500)
+		sendErrorJSONWithoutLog(w, err, 500)
 	} else {
 		sendJSON(w, user, 200)
 	}
