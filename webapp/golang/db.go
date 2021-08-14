@@ -103,7 +103,3 @@ func initCounter(c context.Context, key string) error {
 func incr(c context.Context, key string) (int64, error) {
 	return rdb.WithContext(c).Incr(c, key).Result()
 }
-
-func decr(c context.Context, key string) (int64, error) {
-	return rdb.WithContext(c).Decr(c, key).Result()
-}

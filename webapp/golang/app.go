@@ -377,7 +377,7 @@ func createScheduleHandler(w http.ResponseWriter, r *http.Request) {
 		schedule.Title = title
 		schedule.Capacity = capacity
 
-		initCounter(ctx, reservationCounter(id))
+		initCounter(ctx, "reservation-"+id)
 		return nil
 	})
 
@@ -441,13 +441,11 @@ func createReservationHandler(w http.ResponseWriter, r *http.Request) {
 			"INSERT INTO `reservations` (`id`, `schedule_id`, `user_id`, `created_at`) VALUES (?, ?, ?, NOW(6))",
 			id, scheduleID, userID,
 		); err != nil {
-			decr(ctx, reservationCounter(scheduleID))
 			return err
 		}
 
 		var createdAt time.Time
 		if err := tx.QueryRowContext(ctx, "SELECT `created_at` FROM `reservations` WHERE `id` = ?", id).Scan(&createdAt); err != nil {
-			decr(ctx, reservationCounter(scheduleID))
 			return err
 		}
 		reservation.ID = id
@@ -460,10 +458,6 @@ func createReservationHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		sendErrorJSON(w, err, 500)
 	}
-}
-
-func reservationCounter(scheduleID string) string {
-	return "reservations-" + scheduleID
 }
 
 func schedulesHandler(w http.ResponseWriter, r *http.Request) {
