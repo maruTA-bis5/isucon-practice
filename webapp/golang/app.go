@@ -89,19 +89,49 @@ func getReservations(r *http.Request, s *Schedule) error {
 
 	reserved := 0
 	s.Reservations = []*Reservation{}
+	var userIds []string
 	for rows.Next() {
 		reservation := &Reservation{}
 		if err := rows.StructScan(reservation); err != nil {
 			return err
 		}
-		reservation.User = getUser(r, reservation.UserID)
+		userIds = append(userIds, reservation.UserID)
 
 		s.Reservations = append(s.Reservations, reservation)
 		reserved++
 	}
+
+	userById, err := bulkLoadUsers(r.Context(), userIds)
+	if err != nil {
+		return err
+	}
+	for _, r := range s.Reservations {
+		usr := userById[r.UserID]
+		r.User = &usr
+	}
 	s.Reserved = reserved
 
 	return nil
+}
+
+func bulkLoadUsers(c context.Context, userIds []string) (map[string]User, error) {
+	query, args, err := sqlx.In("SELECT * FROM users WHERE id IN (?)", userIds)
+	if err != nil {
+		return nil, err
+	}
+	var users []User
+	err = db.SelectContext(c, &users, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	userById := make(map[string]User)
+
+	for _, u := range users {
+		id := u.ID
+		userById[id] = u
+	}
+
+	return userById, nil
 }
 
 func getReservationsCount(r *http.Request, s *Schedule) error {
