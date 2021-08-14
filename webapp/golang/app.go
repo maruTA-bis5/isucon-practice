@@ -55,6 +55,10 @@ func getCurrentUser(r *http.Request) *User {
 	if err != nil || uidCookie == nil {
 		return nil
 	}
+	currentUser := r.Context().Value("currentUser").(*User)
+	if currentUser != nil {
+		return currentUser
+	}
 	row := db.QueryRowxContext(r.Context(), "SELECT * FROM `users` WHERE `id` = ? LIMIT 1", uidCookie.Value)
 	user := &User{}
 	if err := row.StructScan(user); err != nil {
@@ -131,6 +135,10 @@ func bulkLoadUsers(c context.Context, userIds []string) (map[string]User, error)
 
 	for _, u := range users {
 		id := u.ID
+		// FIXME current userはクリアしない
+		if !u.Staff {
+			u.Email = ""
+		}
 		userById[id] = u
 	}
 
@@ -176,6 +184,13 @@ func parseForm(r *http.Request) error {
 func serveMux(nrApp *newrelic.Application) http.Handler {
 	router := mux.NewRouter()
 	router.Use(nrgorilla.Middleware(nrApp))
+	router.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			currentUser := getCurrentUser(r)
+			context := context.WithValue(r.Context(), "currentUser", currentUser)
+			next.ServeHTTP(w, r.WithContext(context))
+		})
+	})
 
 	router.HandleFunc("/initialize", initializeHandler).Methods("POST")
 	router.HandleFunc("/api/session", sessionHandler).Methods("GET")
