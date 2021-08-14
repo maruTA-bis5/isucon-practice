@@ -80,26 +80,21 @@ func requiredStaffLogin(w http.ResponseWriter, r *http.Request) bool {
 }
 
 func getReservations(r *http.Request, s *Schedule) error {
-	rows, err := db.QueryxContext(r.Context(), "SELECT r.*, u.* FROM `reservations` r INNER JOIN users u on r.user_id = u.id WHERE `schedule_id` = ?", s.ID)
+	rows, err := db.QueryxContext(r.Context(), "SELECT * FROM `reservations` WHERE `schedule_id` = ?", s.ID)
 	if err != nil {
 		return err
 	}
 
 	defer rows.Close()
 
-	var reservationRow struct {
-		Reservation *Reservation `db:"r"`
-		User        *User        `db:"u"`
-	}
-
 	reserved := 0
 	s.Reservations = []*Reservation{}
 	for rows.Next() {
-		if err := rows.StructScan(&reservationRow); err != nil {
+		reservation := &Reservation{}
+		if err := rows.StructScan(reservation); err != nil {
 			return err
 		}
-		reservation := reservationRow.Reservation
-		reservation.User = reservationRow.User
+		reservation.User = getUser(r, reservation.UserID)
 
 		s.Reservations = append(s.Reservations, reservation)
 		reserved++
