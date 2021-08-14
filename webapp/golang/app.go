@@ -55,9 +55,9 @@ func getCurrentUser(r *http.Request) *User {
 	if err != nil || uidCookie == nil {
 		return nil
 	}
-	currentUser := r.Context().Value("currentUser").(*User)
+	currentUser := r.Context().Value("currentUser")
 	if currentUser != nil {
-		return currentUser
+		return currentUser.(*User)
 	}
 	row := db.QueryRowxContext(r.Context(), "SELECT * FROM `users` WHERE `id` = ? LIMIT 1", uidCookie.Value)
 	user := &User{}
