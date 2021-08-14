@@ -138,7 +138,7 @@ func bulkLoadUsers(r *http.Request, userIds []string) (map[string]User, error) {
 	for _, u := range users {
 		id := u.ID
 
-		if currentUser != nil && !u.Staff {
+		if currentUser != nil && !currentUser.Staff {
 			u.Email = ""
 		}
 		userById[id] = u
