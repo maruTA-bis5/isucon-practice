@@ -44,8 +44,6 @@ func main() {
 		Handler: serveMux(nrApp),
 	}
 
-	initRedisClient(nrApp)
-
 	if err := srv.ListenAndServe(); err != nil {
 		log.Fatal(err)
 	}
