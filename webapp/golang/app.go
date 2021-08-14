@@ -501,13 +501,13 @@ func schedulesHandler(w http.ResponseWriter, r *http.Request) {
 	var scheduleIds []string
 	scheduleById := make(map[string]*Schedule)
 	for rows.Next() {
-		var schedule Schedule
-		if err := rows.StructScan(&schedule); err != nil {
+		schedule := &Schedule{}
+		if err := rows.StructScan(schedule); err != nil {
 			sendErrorJSON(w, err, 500)
 			return
 		}
-		schedules = append(schedules, &schedule)
-		scheduleById[schedule.ID] = &schedule
+		schedules = append(schedules, schedule)
+		scheduleById[schedule.ID] = schedule
 		scheduleIds = append(scheduleIds, schedule.ID)
 	}
 	reservationsBySchedule, err := bulkLoadReservationsCount(r, scheduleIds)
