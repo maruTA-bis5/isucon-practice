@@ -508,6 +508,7 @@ func schedulesHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		schedules = append(schedules, schedule)
 		scheduleById[schedule.ID] = schedule
+		scheduleIds = append(scheduleIds, schedule.ID)
 	}
 	reservationsBySchedule, err := bulkLoadReservationsCount(r, scheduleIds)
 	if err != nil {
@@ -515,7 +516,8 @@ func schedulesHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	for id, count := range reservationsBySchedule {
-		scheduleById[id].Reserved = int(count)
+		schedule := scheduleById[id]
+		schedule.Reserved = int(count)
 	}
 
 	sendJSON(w, schedules, 200)
