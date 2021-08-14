@@ -426,12 +426,13 @@ func createReservationHandler(w http.ResponseWriter, r *http.Request) {
 			return sendErrorJSON(w, err, 500)
 		}
 
-		reserved, err := incr(ctx, "reservation-"+scheduleID)
-		if err != nil {
+		var reserved int
+		err := tx.GetContext(ctx, &reserved, "SELECT Count(*) FROM `reservations` WHERE `schedule_id` = ?", scheduleID)
+		if err != nil && err != sql.ErrNoRows {
 			return sendErrorJSON(w, err, 500)
 		}
 
-		if reserved >= int64(capacity) {
+		if reserved >= capacity {
 			return sendErrorJSON(w, fmt.Errorf("capacity is already full"), 403)
 		}
 

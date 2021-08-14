@@ -9,17 +9,13 @@ import (
 	"os"
 	"time"
 
-	"github.com/go-redis/redis/v8"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/newrelic/go-agent/v3/integrations/nrmysql"
-	nrredis "github.com/newrelic/go-agent/v3/integrations/nrredis-v8"
-	"github.com/newrelic/go-agent/v3/newrelic"
 	"github.com/oklog/ulid/v2"
 )
 
 var (
-	db  *sqlx.DB
-	rdb *redis.Client
+	db *sqlx.DB
 )
 
 var (
@@ -50,16 +46,6 @@ func init() {
 		log.Fatal(err)
 	}
 	db.SetConnMaxLifetime(10 * time.Second)
-}
-
-func initRedisClient(nrApp *newrelic.Application) {
-	opts := &redis.Options{
-		Addr:     Getenv("REDIS_ADDR", "localhost:6379"),
-		Password: "",
-		DB:       0,
-	}
-	rdb = redis.NewClient(opts)
-	rdb.AddHook(nrredis.NewHook(opts))
 }
 
 type transactionHandler func(context.Context, *sqlx.Tx) error
@@ -94,8 +80,4 @@ func generateID(tx *sqlx.Tx, table string) string {
 		id = ulid.MustNew(ulid.Timestamp(time.Now()), entropy).String()
 	}
 	return id
-}
-
-func incr(c context.Context, key string) (int64, error) {
-	return rdb.WithContext(c).Incr(c, key).Result()
 }
