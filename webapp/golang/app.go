@@ -377,10 +377,9 @@ func createScheduleHandler(w http.ResponseWriter, r *http.Request) {
 		schedule.Title = title
 		schedule.Capacity = capacity
 
+		initCounter(ctx, reservationCounter(id))
 		return nil
 	})
-
-	initCounter(r.Context(), reservationCounter(schedule.ID))
 
 	if err != nil {
 		sendErrorJSON(w, err, 500)
