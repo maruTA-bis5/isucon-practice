@@ -491,6 +491,9 @@ func schedulesHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func bulkLoadReservationsCount(r *http.Request, scheduleIds []string) (map[string]int64, error) {
+	if len(scheduleIds) == 0 {
+		return make(map[string]int64), nil
+	}
 	query, args, err := sqlx.In("SELECT schedule_id, Count(schedule_id) c FROM reservations WHERE schedule_id IN (?) GROUP BY schedule_id", scheduleIds)
 	if err != nil {
 		return nil, err
