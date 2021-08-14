@@ -397,7 +397,8 @@ func (c *ScheduleMutexContainer) Lock(scheduleID string) {
 
 	scheduleLock := c.mutexes[scheduleID]
 	if scheduleLock == nil {
-		c.mutexes[scheduleID] = &sync.Mutex{}
+		scheduleLock = &sync.Mutex{}
+		c.mutexes[scheduleID] = scheduleLock
 	}
 	c.mapLock.Unlock()
 
