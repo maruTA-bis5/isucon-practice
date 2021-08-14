@@ -394,7 +394,6 @@ type ScheduleMutexContainer struct {
 
 func (c *ScheduleMutexContainer) Lock(scheduleID string) {
 	c.mapLock.Lock()
-	defer c.mapLock.Unlock()
 
 	scheduleLock := c.mutexes[scheduleID]
 	if scheduleLock == nil {
@@ -407,7 +406,6 @@ func (c *ScheduleMutexContainer) Lock(scheduleID string) {
 
 func (c *ScheduleMutexContainer) Unlock(scheduleID string) {
 	c.mapLock.RLock()
-	defer c.mapLock.RUnlock()
 
 	scheduleLock := c.mutexes[scheduleID]
 	if scheduleLock == nil {
