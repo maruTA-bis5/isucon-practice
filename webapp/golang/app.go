@@ -16,6 +16,8 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/jmoiron/sqlx"
+	"github.com/newrelic/go-agent/v3/integrations/nrgorilla"
+	"github.com/newrelic/go-agent/v3/newrelic"
 )
 
 var (
@@ -138,8 +140,9 @@ func parseForm(r *http.Request) error {
 	}
 }
 
-func serveMux() http.Handler {
+func serveMux(nrApp *newrelic.Application) http.Handler {
 	router := mux.NewRouter()
+	router.Use(nrgorilla.Middleware(nrApp))
 
 	router.HandleFunc("/initialize", initializeHandler).Methods("POST")
 	router.HandleFunc("/api/session", sessionHandler).Methods("GET")
