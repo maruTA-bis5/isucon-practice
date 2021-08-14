@@ -115,6 +115,9 @@ func getReservations(r *http.Request, s *Schedule) error {
 }
 
 func bulkLoadUsers(c context.Context, userIds []string) (map[string]User, error) {
+	if len(userIds) == 0 {
+		return make(map[string]User), nil
+	}
 	query, args, err := sqlx.In("SELECT * FROM users WHERE id IN (?)", userIds)
 	if err != nil {
 		return nil, err
