@@ -383,7 +383,9 @@ func createScheduleHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-var scheduleMutexContainer *ScheduleMutexContainer = &ScheduleMutexContainer{}
+var scheduleMutexContainer *ScheduleMutexContainer = &ScheduleMutexContainer{
+	mutexes: make(map[string]*sync.Mutex),
+}
 
 type ScheduleMutexContainer struct {
 	mutexes map[string]*sync.Mutex
