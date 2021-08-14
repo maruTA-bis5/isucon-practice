@@ -377,7 +377,6 @@ func createScheduleHandler(w http.ResponseWriter, r *http.Request) {
 		schedule.Title = title
 		schedule.Capacity = capacity
 
-		initCounter(ctx, "reservation-"+id)
 		return nil
 	})
 
