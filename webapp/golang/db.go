@@ -9,8 +9,8 @@ import (
 	"os"
 	"time"
 
-	_ "github.com/go-sql-driver/mysql"
 	"github.com/jmoiron/sqlx"
+	_ "github.com/newrelic/go-agent/v3/integrations/nrmysql"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -41,7 +41,7 @@ func init() {
 	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=true", user, pass, host, port, name)
 
 	var err error
-	db, err = sqlx.Connect("mysql", dsn)
+	db, err = sqlx.Connect("nrmysql", dsn)
 	if err != nil {
 		log.Fatal(err)
 	}
