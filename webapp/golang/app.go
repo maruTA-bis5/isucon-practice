@@ -398,13 +398,13 @@ func createReservationHandler(w http.ResponseWriter, r *http.Request) {
 		scheduleID := r.PostFormValue("schedule_id")
 		userID := getCurrentUser(r).ID
 
-		var schedule *Schedule
-		tx.QueryRowContext(ctx, "SELECT id, capacity FROM `schedules` WHERE `id` = ? LIMIT 1 FOR UPDATE", scheduleID).Scan(schedule)
-		if schedule == nil {
+		found := 0
+		tx.QueryRowContext(ctx, "SELECT 1 FROM `schedules` WHERE `id` = ? LIMIT 1 FOR UPDATE", scheduleID).Scan(&found)
+		if found != 1 {
 			return sendErrorJSON(w, fmt.Errorf("schedule not found"), 403)
 		}
 
-		found := 0
+		found = 0
 		tx.QueryRowContext(ctx, "SELECT 1 FROM `users` WHERE `id` = ? LIMIT 1", userID).Scan(&found)
 		if found != 1 {
 			return sendErrorJSON(w, fmt.Errorf("user not found"), 403)
@@ -416,7 +416,10 @@ func createReservationHandler(w http.ResponseWriter, r *http.Request) {
 			return sendErrorJSON(w, fmt.Errorf("already taken"), 403)
 		}
 
-		capacity := schedule.Capacity
+		capacity := 0
+		if err := tx.QueryRowContext(ctx, "SELECT `capacity` FROM `schedules` WHERE `id` = ? LIMIT 1", scheduleID).Scan(&capacity); err != nil {
+			return sendErrorJSON(w, err, 500)
+		}
 
 		var reserved int
 		err := tx.GetContext(ctx, &reserved, "SELECT Count(*) FROM `reservations` WHERE `schedule_id` = ?", scheduleID)
