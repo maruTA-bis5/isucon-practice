@@ -96,6 +96,10 @@ func generateID(tx *sqlx.Tx, table string) string {
 	return id
 }
 
+func initCounter(c context.Context, key string) error {
+	return rdb.WithContext(c).Set(c, key, 0, 0).Err()
+}
+
 func incr(c context.Context, key string) (int64, error) {
 	return rdb.WithContext(c).Incr(c, key).Result()
 }
