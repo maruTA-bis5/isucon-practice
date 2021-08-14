@@ -11,4 +11,5 @@ require (
 	github.com/newrelic/go-agent/v3/integrations/nrgorilla v1.1.1
 	github.com/newrelic/go-agent/v3/integrations/nrmysql v1.2.1
 	github.com/oklog/ulid/v2 v2.0.2
+	github.com/rs/xid v1.3.0
 )
