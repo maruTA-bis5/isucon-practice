@@ -250,15 +250,51 @@ func (*AdminService) ListClarifications(e echo.Context) error {
 	if err != nil {
 		return fmt.Errorf("bulkLoad Teams: %w", err)
 	}
+	members, err := bulkLoadMultipleTeamMembers(e, teamIDs)
+	if err != nil {
+		return err
+	}
 	for _, clarification := range clarifications {
 		team := teams[clarification.TeamID]
-		c, err := makeClarificationPB(e.Request().Context(), db, &clarification, &team)
+		c, err := makeClarificationPBWithMembers(e.Request().Context(), db, &clarification, &team, members[clarification.TeamID])
 		if err != nil {
 			return fmt.Errorf("make clarification: %w", err)
 		}
 		res.Clarifications = append(res.Clarifications, c)
 	}
 	return writeProto(e, http.StatusOK, res)
+}
+
+func bulkLoadMultipleTeamMembers(e echo.Context, teamIDs []int64) (map[int64][]xsuportal.Contestant, error) {
+	if len(teamIDs) == 0 {
+		return make(map[int64][]xsuportal.Contestant), nil
+	}
+	if nrEnabled {
+		defer newrelic.FromContext(e.Request().Context()).StartSegment("bulkLoadMultipleTeamMembers").End()
+	}
+	query, args, err := sqlx.In("SELECT * FROM contestants WHERE team_id IN (?)", teamIDs)
+	if err != nil {
+		return nil, fmt.Errorf("bulkLoadMultipleTeamMembers: %w", err)
+	}
+	var members []xsuportal.Contestant
+	err = db.SelectContext(e.Request().Context(), &members, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("bulkLoadMultipleTeamMembers: %w", err)
+	}
+	membersByTeam := make(map[int64][]xsuportal.Contestant)
+	for _, member := range members {
+		if !member.TeamID.Valid {
+			continue
+		}
+		teamID := member.TeamID.Int64
+		teamMembers := membersByTeam[teamID]
+		if teamMembers == nil {
+			teamMembers = []xsuportal.Contestant{}
+		}
+		teamMembers = append(teamMembers, member)
+		membersByTeam[teamID] = teamMembers
+	}
+	return membersByTeam, nil
 }
 
 func bulkLoadTeams(e echo.Context, teamIDs []int64) (map[int64]xsuportal.Team, error) {
