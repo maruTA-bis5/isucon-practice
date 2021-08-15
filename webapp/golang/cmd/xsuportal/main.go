@@ -1277,6 +1277,9 @@ func getCurrentContestant(e echo.Context, db sqlx.QueryerContext, lock bool) (*x
 }
 
 func getCurrentTeam(e echo.Context, db sqlx.QueryerContext, lock bool) (*xsuportal.Team, error) {
+	if nrEnabled {
+		defer newrelic.FromContext(e.Request().Context()).StartSegment("getCurrentTeam").End()
+	}
 	xc := getXsuportalContext(e)
 	if xc.Team != nil {
 		return xc.Team, nil
