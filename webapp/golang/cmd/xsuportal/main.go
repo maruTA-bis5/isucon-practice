@@ -16,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-redis/redis/v8"
 	"github.com/go-sql-driver/mysql"
 	"github.com/golang/protobuf/proto"
 	"github.com/gorilla/sessions"
@@ -51,6 +52,7 @@ var notifier xsuportal.Notifier
 var teamCapacity int
 var nrApp *newrelic.Application
 var nrEnabled bool = false
+var rdb *redis.Client
 
 func main() {
 	srv := echo.New()
@@ -93,6 +95,7 @@ func main() {
 
 	db, _ = xsuportal.GetDB()
 	db.SetMaxOpenConns(10)
+	rdb = xsuportal.GetRedis()
 
 	srv.Use(middleware.Logger())
 	srv.Use(middleware.Recover())
@@ -1192,18 +1195,23 @@ func (*AudienceService) ListTeams(e echo.Context) error {
 }
 
 func (*AudienceService) Dashboard(e echo.Context) error {
-	ifModifiedSince := e.Request().Header.Get("If-Modified-Since")
-	now := time.Now().Add(1 * time.Second)
-	if t, err := time.Parse("Mon, 02 Jan 2006 15:04:05 MST", ifModifiedSince); err == nil && t.After(now) {
-		e.Response().WriteHeader(304)
-		return nil
+	key := strconv.Itoa(int(time.Now().Unix() / 1000))
+	cachedLeaderboard, err := rdb.WithContext(e.Request().Context()).Get(e.Request().Context(), key).Result()
+	if cachedLeaderboard != "" {
+		leaderboard := &resourcespb.Leaderboard{}
+		err := proto.Unmarshal([]byte(cachedLeaderboard), leaderboard)
+		if err == nil {
+			return writeProto(e, http.StatusOK, &audiencepb.DashboardResponse{
+				Leaderboard: leaderboard,
+			})
+		}
 	}
 
 	leaderboard, err := makeLeaderboardPB(e, 0)
 	if err != nil {
 		return fmt.Errorf("make leaderboard: %w", err)
 	}
-	e.Response().Header().Set("Last-Modified", fmt.Sprint(now.Add(1*time.Second).Format("Mon, 02 Jan 2006 15:04:05 MST")))
+	rdb.WithContext(e.Request().Context()).SetEX(e.Request().Context(), key, leaderboard.String(), 1*time.Second)
 
 	return writeProto(e, http.StatusOK, &audiencepb.DashboardResponse{
 		Leaderboard: leaderboard,
