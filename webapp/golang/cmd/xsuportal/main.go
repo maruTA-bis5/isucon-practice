@@ -1540,6 +1540,9 @@ func makeContestPB(e echo.Context) (*resourcespb.Contest, error) {
 }
 
 func makeLeaderboardPB(e echo.Context, teamID int64) (*resourcespb.Leaderboard, error) {
+	if nrEnabled {
+		defer newrelic.FromContext(e.Request().Context()).StartSegment("makeLeaderBoardPB").End()
+	}
 	contestStatus, err := getCurrentContestStatus(e, db)
 	if err != nil {
 		return nil, fmt.Errorf("get current contest status: %w", err)
@@ -1651,7 +1654,7 @@ func makeLeaderboardPB(e echo.Context, teamID int64) (*resourcespb.Leaderboard, 
 		return nil, fmt.Errorf("commit tx: %w", err)
 	}
 	if nrEnabled {
-		defer newrelic.FromContext(e.Request().Context()).StartSegment("makeLeaderBoardPB/createPB").End()
+		defer newrelic.FromContext(e.Request().Context()).StartSegment("makeLeaderBoardPB.createPB").End()
 	}
 	teamGraphScores := make(map[int64][]*resourcespb.Leaderboard_LeaderboardItem_LeaderboardScore)
 	for _, jobResult := range jobResults {
