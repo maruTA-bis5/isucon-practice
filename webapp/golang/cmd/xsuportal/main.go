@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -22,6 +23,8 @@ import (
 	"github.com/labstack/echo-contrib/session"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	"github.com/newrelic/go-agent/v3/integrations/nrecho-v4"
+	"github.com/newrelic/go-agent/v3/newrelic"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	xsuportal "github.com/isucon/isucon10-final/webapp/golang"
@@ -49,6 +52,23 @@ var notifier xsuportal.Notifier
 
 func main() {
 	srv := echo.New()
+
+	nrLicense := util.GetEnv("NEWRELIC_LICENSE", "")
+	if nrLicense != "" {
+		nrApp, err := newrelic.NewApplication(
+			newrelic.ConfigAppName("xsuportal"),
+			newrelic.ConfigLicense(nrLicense),
+			newrelic.ConfigDebugLogger(os.Stdout),
+			func(cfg *newrelic.Config) {
+				cfg.CustomInsightsEvents.Enabled = true
+			},
+		)
+		if err != nil {
+			panic(err)
+		}
+		srv.Use(nrecho.Middleware(nrApp))
+	}
+
 	srv.Debug = util.GetEnv("DEBUG", "") != ""
 	srv.Server.Addr = fmt.Sprintf(":%v", util.GetEnv("PORT", "9292"))
 	srv.HideBanner = true

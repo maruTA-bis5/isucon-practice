@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"os"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -15,6 +16,9 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
+
+	"github.com/newrelic/go-agent/v3/integrations/nrgrpc"
+	"github.com/newrelic/go-agent/v3/newrelic"
 
 	xsuportal "github.com/isucon/isucon10-final/webapp/golang"
 	"github.com/isucon/isucon10-final/webapp/golang/proto/xsuportal/resources"
@@ -281,7 +285,28 @@ func main() {
 	db, _ = xsuportal.GetDB()
 	db.SetMaxOpenConns(10)
 
-	server := grpc.NewServer()
+	var server *grpc.Server
+
+	nrLicense := util.GetEnv("NEWRELIC_LICENSE", "")
+	if nrLicense != "" {
+		nrApp, err := newrelic.NewApplication(
+			newrelic.ConfigAppName("xsubench"),
+			newrelic.ConfigLicense(nrLicense),
+			newrelic.ConfigDebugLogger(os.Stdout),
+			func(cfg *newrelic.Config) {
+				cfg.CustomInsightsEvents.Enabled = true
+			},
+		)
+		if err != nil {
+			panic(err)
+		}
+		server = grpc.NewServer(
+			grpc.UnaryInterceptor(nrgrpc.UnaryServerInterceptor(nrApp)),
+			grpc.StreamInterceptor(nrgrpc.StreamServerInterceptor(nrApp)),
+		)
+	} else {
+		server = grpc.NewServer()
+	}
 
 	queue := &benchmarkQueueService{}
 	report := &benchmarkReportService{}
