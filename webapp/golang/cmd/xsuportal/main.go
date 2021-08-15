@@ -250,9 +250,13 @@ func (*AdminService) ListClarifications(e echo.Context) error {
 	if err != nil {
 		return fmt.Errorf("bulkLoad Teams: %w", err)
 	}
+	members, err := bulkLoadContestantsByTeamIDs(e.Request().Context(), db, teamIDs)
+	if err != nil {
+		return fmt.Errorf("bulkLoad Contestants: %w", err)
+	}
 	for _, clarification := range clarifications {
 		team := teams[clarification.TeamID]
-		c, err := makeClarificationPB(e.Request().Context(), db, &clarification, &team)
+		c, err := makeClarificationPB(e.Request().Context(), db, &clarification, &team, members)
 		if err != nil {
 			return fmt.Errorf("make clarification: %w", err)
 		}
@@ -313,7 +317,7 @@ func (*AdminService) GetClarification(e echo.Context) error {
 	if err != nil {
 		return fmt.Errorf("get team: %w", err)
 	}
-	c, err := makeClarificationPB(e.Request().Context(), db, &clarification, &team)
+	c, err := makeClarificationPBSingleTeam(e.Request().Context(), db, &clarification, &team)
 	if err != nil {
 		return fmt.Errorf("make clarification: %w", err)
 	}
@@ -391,7 +395,7 @@ func (*AdminService) RespondClarification(e echo.Context) error {
 	if err != nil {
 		return fmt.Errorf("get team: %w", err)
 	}
-	c, err := makeClarificationPB(e.Request().Context(), tx, &clarification, &team)
+	c, err := makeClarificationPBSingleTeam(e.Request().Context(), tx, &clarification, &team)
 	if err != nil {
 		return fmt.Errorf("make clarification: %w", err)
 	}
@@ -423,7 +427,7 @@ func (*CommonService) GetCurrentSession(e echo.Context) error {
 		return fmt.Errorf("get current team: %w", err)
 	}
 	if currentTeam != nil {
-		res.Team, err = makeTeamPB(e.Request().Context(), db, currentTeam, true, true)
+		res.Team, err = makeTeamPBSingleTeam(e.Request().Context(), db, currentTeam, true)
 		if err != nil {
 			return fmt.Errorf("make team: %w", err)
 		}
@@ -556,6 +560,10 @@ func (*ContestantService) ListClarifications(e echo.Context) error {
 		return fmt.Errorf("select clarifications: %w", err)
 	}
 	res := &contestantpb.ListClarificationsResponse{}
+	members, err := bulkLoadContestantsByTeamIDs(e.Request().Context(), db, []int64{team.ID})
+	if err != nil {
+		return err
+	}
 	for _, clarification := range clarifications {
 		var team xsuportal.Team
 		err := db.GetContext(
@@ -567,7 +575,7 @@ func (*ContestantService) ListClarifications(e echo.Context) error {
 		if err != nil {
 			return fmt.Errorf("get team(id=%v): %w", clarification.TeamID, err)
 		}
-		c, err := makeClarificationPB(e.Request().Context(), db, &clarification, &team)
+		c, err := makeClarificationPB(e.Request().Context(), db, &clarification, &team, members)
 		if err != nil {
 			return fmt.Errorf("make clarification: %w", err)
 		}
@@ -607,7 +615,7 @@ func (*ContestantService) RequestClarification(e echo.Context) error {
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("commit tx: %w", err)
 	}
-	c, err := makeClarificationPB(e.Request().Context(), db, &clarification, team)
+	c, err := makeClarificationPBSingleTeam(e.Request().Context(), db, &clarification, team)
 	if err != nil {
 		return fmt.Errorf("make clarification: %w", err)
 	}
@@ -920,7 +928,7 @@ func (*RegistrationService) GetRegistrationSession(e echo.Context) error {
 		return fmt.Errorf("undeterminable status")
 	}
 	if team != nil {
-		res.Team, err = makeTeamPB(e.Request().Context(), db, team, contestant != nil && currentTeam != nil && contestant.ID == currentTeam.LeaderID.String, true)
+		res.Team, err = makeTeamPBSingleTeam(e.Request().Context(), db, team, contestant != nil && currentTeam != nil && contestant.ID == currentTeam.LeaderID.String)
 		if err != nil {
 			return fmt.Errorf("make team: %w", err)
 		}
@@ -1391,11 +1399,16 @@ func halt(e echo.Context, code int, humanMessage string, err error) error {
 	return e.Blob(code, "application/vnd.google.protobuf; proto=xsuportal.proto.Error", res)
 }
 
-func makeClarificationPB(ctx context.Context, db sqlx.QueryerContext, c *xsuportal.Clarification, t *xsuportal.Team) (*resourcespb.Clarification, error) {
-	team, err := makeTeamPB(ctx, db, t, false, true)
+func makeClarificationPBSingleTeam(ctx context.Context, db sqlx.QueryerContext, c *xsuportal.Clarification, t *xsuportal.Team) (*resourcespb.Clarification, error) {
+	members, err := bulkLoadContestantsByTeamIDs(ctx, db, []int64{t.ID})
 	if err != nil {
-		return nil, fmt.Errorf("make team: %w", err)
+		return nil, err
 	}
+	return makeClarificationPB(ctx, db, c, t, members)
+}
+
+func makeClarificationPB(ctx context.Context, db sqlx.QueryerContext, c *xsuportal.Clarification, t *xsuportal.Team, membersByTeamID map[int64][]xsuportal.Contestant) (*resourcespb.Clarification, error) {
+	team := makeTeamPBWithMembers(ctx, db, t, false, membersByTeamID)
 	pb := &resourcespb.Clarification{
 		Id:        c.ID,
 		TeamId:    c.TeamID,
@@ -1412,7 +1425,54 @@ func makeClarificationPB(ctx context.Context, db sqlx.QueryerContext, c *xsuport
 	return pb, nil
 }
 
-func makeTeamPB(ctx context.Context, db sqlx.QueryerContext, t *xsuportal.Team, detail bool, enableMembers bool) (*resourcespb.Team, error) {
+func bulkLoadContestantsByTeamIDs(ctx context.Context, db sqlx.QueryerContext, teamIDs []int64) (map[int64][]xsuportal.Contestant, error) {
+	if len(teamIDs) == 0 {
+		return make(map[int64][]xsuportal.Contestant), nil
+	}
+	query, args, err := sqlx.In("SELECT * FROM contestants WHERE team_id IN (?)", teamIDs)
+	if err != nil {
+		return nil, fmt.Errorf("bulkLoadContestantsById: %w", err)
+	}
+	var contestants []xsuportal.Contestant
+	err = sqlx.SelectContext(ctx, db, &contestants, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("bulkLoadContestantsById: %w", err)
+	}
+	contestantsByTeamID := make(map[int64][]xsuportal.Contestant)
+	for _, c := range contestants {
+		teamID := c.TeamID.Int64
+		teamMembers := contestantsByTeamID[teamID]
+		if teamMembers == nil {
+			teamMembers = []xsuportal.Contestant{}
+		}
+		teamMembers = append(teamMembers, c)
+		contestantsByTeamID[teamID] = teamMembers
+	}
+	return contestantsByTeamID, nil
+}
+
+func makeTeamPBWithMembers(ctx context.Context, db sqlx.QueryerContext, t *xsuportal.Team, detail bool, membersByTeamID map[int64][]xsuportal.Contestant) *resourcespb.Team {
+	pb := makeTeamPB(ctx, db, t, detail)
+	members := membersByTeamID[t.ID]
+	for _, member := range members {
+		pb.Members = append(pb.Members, makeContestantPB(&member))
+		pb.MemberIds = append(pb.MemberIds, member.ID)
+		if t.LeaderID.Valid && t.LeaderID.String == member.ID {
+			pb.Leader = makeContestantPB(&member)
+		}
+	}
+	return pb
+}
+
+func makeTeamPBSingleTeam(ctx context.Context, db sqlx.QueryerContext, t *xsuportal.Team, detail bool) (*resourcespb.Team, error) {
+	members, err := bulkLoadContestantsByTeamIDs(ctx, db, []int64{t.ID})
+	if err != nil {
+		return nil, err
+	}
+	return makeTeamPBWithMembers(ctx, db, t, detail, members), nil
+}
+
+func makeTeamPB(ctx context.Context, db sqlx.QueryerContext, t *xsuportal.Team, detail bool) *resourcespb.Team {
 	pb := &resourcespb.Team{
 		Id:        t.ID,
 		Name:      t.Name,
@@ -1425,29 +1485,12 @@ func makeTeamPB(ctx context.Context, db sqlx.QueryerContext, t *xsuportal.Team, 
 			InviteToken:  t.InviteToken,
 		}
 	}
-	if enableMembers {
-		if t.LeaderID.Valid {
-			var leader xsuportal.Contestant
-			if err := sqlx.GetContext(ctx, db, &leader, "SELECT * FROM `contestants` WHERE `id` = ? LIMIT 1", t.LeaderID.String); err != nil {
-				return nil, fmt.Errorf("get leader: %w", err)
-			}
-			pb.Leader = makeContestantPB(&leader)
-		}
-		var members []xsuportal.Contestant
-		if err := sqlx.SelectContext(ctx, db, &members, "SELECT * FROM `contestants` WHERE `team_id` = ? ORDER BY `created_at`", t.ID); err != nil {
-			return nil, fmt.Errorf("select members: %w", err)
-		}
-		for _, member := range members {
-			pb.Members = append(pb.Members, makeContestantPB(&member))
-			pb.MemberIds = append(pb.MemberIds, member.ID)
-		}
-	}
 	if t.Student.Valid {
 		pb.Student = &resourcespb.Team_StudentStatus{
 			Status: t.Student.Bool,
 		}
 	}
-	return pb, nil
+	return pb
 }
 
 func makeContestantPB(c *xsuportal.Contestant) *resourcespb.Contestant {
@@ -1599,7 +1642,7 @@ func makeLeaderboardPB(e echo.Context, teamID int64) (*resourcespb.Leaderboard, 
 	}
 	pb := &resourcespb.Leaderboard{}
 	for _, team := range leaderboard {
-		t, _ := makeTeamPB(e.Request().Context(), db, team.Team(), false, false)
+		t := makeTeamPB(e.Request().Context(), db, team.Team(), false)
 		item := &resourcespb.Leaderboard_LeaderboardItem{
 			Scores: teamGraphScores[team.ID],
 			BestScore: &resourcespb.Leaderboard_LeaderboardItem_LeaderboardScore{
