@@ -56,7 +56,8 @@ func (b *benchmarkQueueService) ReceiveBenchmarkJob(ctx context.Context, req *be
 			}
 
 			var gotLock bool
-			err = tx.Get(
+			err = tx.GetContext(
+				ctx,
 				&gotLock,
 				"SELECT 1 FROM `benchmark_jobs` WHERE `id` = ? AND `status` = ? FOR UPDATE",
 				job.ID,
@@ -74,7 +75,8 @@ func (b *benchmarkQueueService) ReceiveBenchmarkJob(ctx context.Context, req *be
 				return false, fmt.Errorf("read random: %w", err)
 			}
 			handle := base64.StdEncoding.EncodeToString(randomBytes)
-			_, err = tx.Exec(
+			_, err = tx.ExecContext(
+				ctx,
 				"UPDATE `benchmark_jobs` SET `status` = ?, `handle` = ? WHERE `id` = ? AND `status` = ? LIMIT 1",
 				resources.BenchmarkJob_SENT,
 				handle,
@@ -86,7 +88,7 @@ func (b *benchmarkQueueService) ReceiveBenchmarkJob(ctx context.Context, req *be
 			}
 
 			var contestStartsAt time.Time
-			err = tx.Get(&contestStartsAt, "SELECT `contest_starts_at` FROM `contest_config` LIMIT 1")
+			err = tx.GetContext(ctx, &contestStartsAt, "SELECT `contest_starts_at` FROM `contest_config` LIMIT 1")
 			if err != nil {
 				return false, fmt.Errorf("get contest starts at: %w", err)
 			}
@@ -147,7 +149,8 @@ func (b *benchmarkReportService) ReportBenchmarkResult(srv bench.BenchmarkReport
 			defer tx.Rollback()
 
 			var job xsuportal.BenchmarkJob
-			err = tx.Get(
+			err = tx.GetContext(
+				srv.Context(),
 				&job,
 				"SELECT * FROM `benchmark_jobs` WHERE `id` = ? AND `handle` = ? LIMIT 1 FOR UPDATE",
 				req.JobId,
@@ -162,7 +165,7 @@ func (b *benchmarkReportService) ReportBenchmarkResult(srv bench.BenchmarkReport
 			}
 			if req.Result.Finished {
 				log.Printf("[DEBUG] %v: save as finished", req.JobId)
-				if err := b.saveAsFinished(tx, &job, req); err != nil {
+				if err := b.saveAsFinished(srv.Context(), tx, &job, req); err != nil {
 					return err
 				}
 				if err := tx.Commit(); err != nil {
@@ -173,7 +176,7 @@ func (b *benchmarkReportService) ReportBenchmarkResult(srv bench.BenchmarkReport
 				}
 			} else {
 				log.Printf("[DEBUG] %v: save as running", req.JobId)
-				if err := b.saveAsRunning(tx, &job, req); err != nil {
+				if err := b.saveAsRunning(srv.Context(), tx, &job, req); err != nil {
 					return err
 				}
 				if err := tx.Commit(); err != nil {
@@ -194,7 +197,7 @@ func (b *benchmarkReportService) ReportBenchmarkResult(srv bench.BenchmarkReport
 	}
 }
 
-func (b *benchmarkReportService) saveAsFinished(db sqlx.Execer, job *xsuportal.BenchmarkJob, req *bench.ReportBenchmarkResultRequest) error {
+func (b *benchmarkReportService) saveAsFinished(ctx context.Context, db sqlx.Execer, job *xsuportal.BenchmarkJob, req *bench.ReportBenchmarkResultRequest) error {
 	if !job.StartedAt.Valid || job.FinishedAt.Valid {
 		return status.Errorf(codes.FailedPrecondition, "Job %v has already finished or has not started yet", req.JobId)
 	}
@@ -227,7 +230,7 @@ func (b *benchmarkReportService) saveAsFinished(db sqlx.Execer, job *xsuportal.B
 	return nil
 }
 
-func (b *benchmarkReportService) saveAsRunning(db sqlx.Execer, job *xsuportal.BenchmarkJob, req *bench.ReportBenchmarkResultRequest) error {
+func (b *benchmarkReportService) saveAsRunning(ctx context.Context, db *sqlx.Tx, job *xsuportal.BenchmarkJob, req *bench.ReportBenchmarkResultRequest) error {
 	if req.Result.MarkedAt == nil {
 		return status.Errorf(codes.InvalidArgument, "marked_at is required")
 	}
@@ -237,7 +240,8 @@ func (b *benchmarkReportService) saveAsRunning(db sqlx.Execer, job *xsuportal.Be
 	} else {
 		startedAt = req.Result.MarkedAt.AsTime().Round(time.Microsecond)
 	}
-	_, err := db.Exec(
+	_, err := db.ExecContext(
+		ctx,
 		"UPDATE `benchmark_jobs` SET `status` = ?, `score_raw` = NULL, `score_deduction` = NULL, `passed` = FALSE, `reason` = NULL, `started_at` = ?, `updated_at` = NOW(6), `finished_at` = NULL WHERE `id` = ? LIMIT 1",
 		resources.BenchmarkJob_RUNNING,
 		startedAt,
