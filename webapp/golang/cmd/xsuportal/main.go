@@ -1212,7 +1212,7 @@ func (*AudienceService) ListTeams(e echo.Context) error {
 
 func (*AudienceService) Dashboard(e echo.Context) error {
 	ifModifiedSince := e.Request().Header.Get("If-Modified-Since")
-	now := time.Now().Add(1 * time.Second)
+	now := time.Now()
 	if t, err := time.Parse("Mon, 02 Jan 2006 15:04:05 MST", ifModifiedSince); err == nil && t.After(now) {
 		e.Response().WriteHeader(304)
 		return nil
