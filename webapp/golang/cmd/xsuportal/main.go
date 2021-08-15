@@ -49,13 +49,17 @@ const (
 var db *sqlx.DB
 var notifier xsuportal.Notifier
 var teamCapacity int
+var nrApp *newrelic.Application
+var nrEnabled bool = false
 
 func main() {
 	srv := echo.New()
+	var err error
 
 	nrLicense := util.GetEnv("NEWRELIC_LICENSE", "")
 	if nrLicense != "" {
-		nrApp, err := newrelic.NewApplication(
+		nrEnabled = true
+		nrApp, err = newrelic.NewApplication(
 			newrelic.ConfigAppName("xsuportal"),
 			newrelic.ConfigLicense(nrLicense),
 			newrelic.ConfigDebugLogger(os.Stdout),
@@ -69,7 +73,6 @@ func main() {
 		srv.Use(nrecho.Middleware(nrApp))
 	}
 
-	var err error
 	teamCapacity, err = strconv.Atoi(util.GetEnv("XSU_TEAM_CAPACITY", "10"))
 	if err != nil {
 		teamCapacity = 10
@@ -1342,6 +1345,10 @@ func contestStatusRestricted(e echo.Context, db sqlx.QueryerContext, status reso
 }
 
 func writeProto(e echo.Context, code int, m proto.Message) error {
+	if nrEnabled {
+		defer nrApp.StartTransaction("writeProto").End()
+	}
+
 	res, _ := proto.Marshal(m)
 	return e.Blob(code, "application/vnd.google.protobuf", res)
 }
@@ -1648,6 +1655,10 @@ func makeBenchmarkJobsPB(e echo.Context, db sqlx.QueryerContext, limit int) ([]*
 }
 
 func makeNotificationsPB(notifications []*xsuportal.Notification) ([]*resourcespb.Notification, error) {
+	if nrEnabled {
+		defer nrApp.StartTransaction("makeNotificationsPB").End()
+	}
+
 	var ns []*resourcespb.Notification
 	for _, notification := range notifications {
 		decoded, err := base64.StdEncoding.DecodeString(notification.EncodedMessage)
