@@ -1193,7 +1193,8 @@ func (*AudienceService) ListTeams(e echo.Context) error {
 
 func (*AudienceService) Dashboard(e echo.Context) error {
 	ifModifiedSince := e.Request().Header.Get("If-Modified-Since")
-	if t, err := time.Parse("Mon, 02 Jan 2006 15:04:05 MST", ifModifiedSince); err == nil && t.After(time.Now()) {
+	now := time.Now().Add(1 * time.Second)
+	if t, err := time.Parse("Mon, 02 Jan 2006 15:04:05 MST", ifModifiedSince); err == nil && t.After(now) {
 		e.Response().WriteHeader(304)
 		return nil
 	}
@@ -1202,7 +1203,7 @@ func (*AudienceService) Dashboard(e echo.Context) error {
 	if err != nil {
 		return fmt.Errorf("make leaderboard: %w", err)
 	}
-	e.Response().Header().Set("Last-Modified", fmt.Sprint(time.Now().Add(1*time.Second).Format("Mon, 02 Jan 2006 15:04:05 MST")))
+	e.Response().Header().Set("Last-Modified", fmt.Sprint(now.Add(1*time.Second).Format("Mon, 02 Jan 2006 15:04:05 MST")))
 
 	return writeProto(e, http.StatusOK, &audiencepb.DashboardResponse{
 		Leaderboard: leaderboard,
