@@ -3,3 +3,7 @@ MYSQL_PORT=3306
 MYSQL_USER=isucon
 MYSQL_PASS=isucon
 MYSQL_DATABASE=xsuportal
+
+BENCHMARK_SERVER_HOST=isubench.t.isucon.dev
+
+NEWRELIC_LICENSE=
