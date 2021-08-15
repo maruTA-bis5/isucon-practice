@@ -1245,6 +1245,9 @@ func getXsuportalContext(e echo.Context) *XsuportalContext {
 }
 
 func getCurrentContestant(e echo.Context, db sqlx.QueryerContext, lock bool) (*xsuportal.Contestant, error) {
+	if nrEnabled {
+		defer newrelic.FromContext(e.Request().Context()).StartSegment("getCurrentContestant").End()
+	}
 	xc := getXsuportalContext(e)
 	if xc.Contestant != nil {
 		return xc.Contestant, nil
@@ -1335,6 +1338,9 @@ type loginRequiredOption struct {
 }
 
 func loginRequired(e echo.Context, db sqlx.QueryerContext, option *loginRequiredOption) (bool, error) {
+	if nrEnabled {
+		defer newrelic.FromContext(e.Request().Context()).StartSegment("loginRequried").End()
+	}
 	contestant, err := getCurrentContestant(e, db, option.Lock)
 	if err != nil {
 		return false, fmt.Errorf("current contestant: %w", err)
