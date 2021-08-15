@@ -1186,6 +1186,8 @@ func (*AudienceService) Dashboard(e echo.Context) error {
 	if err != nil {
 		return fmt.Errorf("make leaderboard: %w", err)
 	}
+	e.Response().Header().Set("Last-Modified", fmt.Sprint(time.Now().Add(1*time.Second).Format("Mon, 02 Jan 2006 15:04:05 MST")))
+
 	return writeProto(e, http.StatusOK, &audiencepb.DashboardResponse{
 		Leaderboard: leaderboard,
 	})
