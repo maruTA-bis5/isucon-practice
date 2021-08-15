@@ -3,6 +3,7 @@ package xsuportal
 import (
 	"github.com/go-sql-driver/mysql"
 	"github.com/jmoiron/sqlx"
+	_ "github.com/newrelic/go-agent/v3/integrations/nrmysql"
 
 	"github.com/isucon/isucon10-final/webapp/golang/util"
 )
@@ -20,5 +21,5 @@ func GetDB() (*sqlx.DB, error) {
 	mysqlConfig.ParseTime = true
 	mysqlConfig.InterpolateParams = true
 
-	return sqlx.Open("mysql", mysqlConfig.FormatDSN())
+	return sqlx.Open("nrmysql", mysqlConfig.FormatDSN())
 }

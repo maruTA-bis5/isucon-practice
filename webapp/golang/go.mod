@@ -13,6 +13,7 @@ require (
 	github.com/newrelic/go-agent/v3 v3.14.1
 	github.com/newrelic/go-agent/v3/integrations/nrecho-v4 v1.0.1
 	github.com/newrelic/go-agent/v3/integrations/nrgrpc v1.3.1
+	github.com/newrelic/go-agent/v3/integrations/nrmysql v1.2.1
 	golang.org/x/crypto v0.0.0-20200930160638-afb6bcd081ae // indirect
 	golang.org/x/net v0.0.0-20200930145003-4acb6c075d10 // indirect
 	golang.org/x/sys v0.0.0-20200930185726-fdedc70b468f // indirect
