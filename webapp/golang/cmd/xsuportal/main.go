@@ -674,7 +674,7 @@ func (*ContestantService) ListNotifications(e echo.Context) error {
 	if err != sql.ErrNoRows && err != nil {
 		return fmt.Errorf("get last answered clarification: %w", err)
 	}
-	ns, err := makeNotificationsPB(notifications)
+	ns, err := makeNotificationsPB(e, notifications)
 	if err != nil {
 		return fmt.Errorf("make notifications: %w", err)
 	}
@@ -1346,7 +1346,7 @@ func contestStatusRestricted(e echo.Context, db sqlx.QueryerContext, status reso
 
 func writeProto(e echo.Context, code int, m proto.Message) error {
 	if nrEnabled {
-		defer nrApp.StartTransaction("writeProto").End()
+		defer newrelic.FromContext(e.Request().Context()).StartSegment("writeProto").End()
 	}
 
 	res, _ := proto.Marshal(m)
@@ -1654,9 +1654,9 @@ func makeBenchmarkJobsPB(e echo.Context, db sqlx.QueryerContext, limit int) ([]*
 	return benchmarkJobs, nil
 }
 
-func makeNotificationsPB(notifications []*xsuportal.Notification) ([]*resourcespb.Notification, error) {
+func makeNotificationsPB(e echo.Context, notifications []*xsuportal.Notification) ([]*resourcespb.Notification, error) {
 	if nrEnabled {
-		defer nrApp.StartTransaction("makeNotificationsPB").End()
+		defer newrelic.FromContext(e.Request().Context()).StartSegment("writeProto").End()
 	}
 
 	var ns []*resourcespb.Notification
