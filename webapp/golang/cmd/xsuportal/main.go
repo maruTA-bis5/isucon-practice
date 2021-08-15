@@ -39,7 +39,6 @@ import (
 )
 
 const (
-	TeamCapacity               = 10
 	AdminID                    = "admin"
 	AdminPassword              = "admin"
 	DebugContestStatusFilePath = "/tmp/XSUPORTAL_CONTEST_STATUS"
@@ -49,6 +48,7 @@ const (
 
 var db *sqlx.DB
 var notifier xsuportal.Notifier
+var teamCapacity int
 
 func main() {
 	srv := echo.New()
@@ -67,6 +67,13 @@ func main() {
 			panic(err)
 		}
 		srv.Use(nrecho.Middleware(nrApp))
+	}
+
+	var err error
+	teamCapacity, err = strconv.Atoi(util.GetEnv("XSU_TEAM_CAPACITY", "10"))
+	if err != nil {
+		teamCapacity = 10
+		panic(err)
 	}
 
 	srv.Debug = util.GetEnv("DEBUG", "") != ""
@@ -936,7 +943,7 @@ func (*RegistrationService) CreateTeam(e echo.Context) error {
 	err = conn.QueryRowContext(
 		ctx,
 		"SELECT COUNT(*) < ? AS `within_capacity` FROM `teams`",
-		TeamCapacity,
+		teamCapacity,
 	).Scan(&withinCapacity)
 	if err != nil {
 		return fmt.Errorf("check capacity: %w", err)
