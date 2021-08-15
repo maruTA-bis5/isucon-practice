@@ -557,17 +557,7 @@ func (*ContestantService) ListClarifications(e echo.Context) error {
 	}
 	res := &contestantpb.ListClarificationsResponse{}
 	for _, clarification := range clarifications {
-		var team xsuportal.Team
-		err := db.GetContext(
-			e.Request().Context(),
-			&team,
-			"SELECT * FROM `teams` WHERE `id` = ? LIMIT 1",
-			clarification.TeamID,
-		)
-		if err != nil {
-			return fmt.Errorf("get team(id=%v): %w", clarification.TeamID, err)
-		}
-		c, err := makeClarificationPB(e.Request().Context(), db, &clarification, &team)
+		c, err := makeClarificationPB(e.Request().Context(), db, &clarification, team)
 		if err != nil {
 			return fmt.Errorf("make clarification: %w", err)
 		}
