@@ -5,9 +5,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	_ "github.com/newrelic/go-agent/v3/integrations/nrmysql"
 
-	"github.com/go-redis/redis/v8"
 	"github.com/isucon/isucon10-final/webapp/golang/util"
-	nrredis "github.com/newrelic/go-agent/v3/integrations/nrredis-v8"
 )
 
 func GetDB() (*sqlx.DB, error) {
@@ -24,12 +22,4 @@ func GetDB() (*sqlx.DB, error) {
 	mysqlConfig.InterpolateParams = true
 
 	return sqlx.Open("nrmysql", mysqlConfig.FormatDSN())
-}
-
-func GetRedis() *redis.Client {
-	opts := &redis.Options{Addr: "localhost:6379"}
-	client := redis.NewClient(opts)
-	client.AddHook(nrredis.NewHook(opts))
-
-	return client
 }
