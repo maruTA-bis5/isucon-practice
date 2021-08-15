@@ -349,7 +349,7 @@ func (*AdminService) RespondClarification(e echo.Context) error {
 	err = tx.GetContext(
 		e.Request().Context(),
 		&clarificationBefore,
-		"SELECT * FROM `clarifications` WHERE `id` = ? LIMIT 1 FOR UPDATE",
+		"SELECT * FROM `clarifications` WHERE `id` = ? LIMIT 1",
 		id,
 	)
 	if err == sql.ErrNoRows {
