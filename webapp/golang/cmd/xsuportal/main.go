@@ -65,6 +65,7 @@ func main() {
 			newrelic.ConfigDebugLogger(os.Stdout),
 			func(cfg *newrelic.Config) {
 				cfg.CustomInsightsEvents.Enabled = true
+				cfg.TransactionTracer.Threshold.Duration = 100 * time.Millisecond
 			},
 		)
 		if err != nil {
