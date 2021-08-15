@@ -23,6 +23,7 @@ import (
 	"github.com/labstack/echo-contrib/session"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	dbprof "github.com/maruTA-bis5/nr-db-stats-profiler"
 	"github.com/newrelic/go-agent/v3/integrations/nrecho-v4"
 	"github.com/newrelic/go-agent/v3/newrelic"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -96,19 +97,7 @@ func main() {
 
 	db, _ = xsuportal.GetDB()
 	if nrEnabled {
-		go func() {
-			for {
-				stats := db.Stats()
-				nrApp.RecordCustomEvent("DBStats", map[string]interface{}{
-					"MaxOpenConnection": stats.MaxOpenConnections,
-					"Idle":              stats.Idle,
-					"OpenConnections":   stats.OpenConnections,
-					"InUse":             stats.InUse,
-					"WaitCount":         stats.WaitCount,
-				})
-				time.Sleep(10 * time.Second)
-			}
-		}()
+		dbprof.EnableDBStatsEventRecord(db, nrApp, 10*time.Second)
 	}
 
 	db.SetMaxOpenConns(util.GetEnvInt("XSU_DB_MAX_CONN", 20))
