@@ -1449,6 +1449,9 @@ func makeClarificationPB(ctx context.Context, db sqlx.QueryerContext, c *xsuport
 }
 
 func makeTeamPBWithMembers(ctx context.Context, db sqlx.QueryerContext, t *xsuportal.Team, detail bool, members []xsuportal.Contestant) (*resourcespb.Team, error) {
+	if nrEnabled {
+		defer newrelic.FromContext(ctx).StartSegment("makeTeamPBWithMembers").End()
+	}
 	pb := &resourcespb.Team{
 		Id:        t.ID,
 		Name:      t.Name,
@@ -1477,6 +1480,9 @@ func makeTeamPBWithMembers(ctx context.Context, db sqlx.QueryerContext, t *xsupo
 }
 
 func makeTeamPB(ctx context.Context, db sqlx.QueryerContext, t *xsuportal.Team, detail bool, enableMembers bool) (*resourcespb.Team, error) {
+	if nrEnabled {
+		defer newrelic.FromContext(ctx).StartSegment("makeTeamPB").End()
+	}
 	pb := &resourcespb.Team{
 		Id:        t.ID,
 		Name:      t.Name,
