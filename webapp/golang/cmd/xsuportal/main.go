@@ -556,14 +556,24 @@ func (*ContestantService) ListClarifications(e echo.Context) error {
 		return fmt.Errorf("select clarifications: %w", err)
 	}
 	res := &contestantpb.ListClarificationsResponse{}
+	members, err := bulkLoadTeamMembers(e.Request().Context(), db, team.ID)
+	if err != nil {
+		return err
+	}
 	for _, clarification := range clarifications {
-		c, err := makeClarificationPB(e.Request().Context(), db, &clarification, team)
+		c, err := makeClarificationPBWithMembers(e.Request().Context(), db, &clarification, team, members)
 		if err != nil {
 			return fmt.Errorf("make clarification: %w", err)
 		}
 		res.Clarifications = append(res.Clarifications, c)
 	}
 	return writeProto(e, http.StatusOK, res)
+}
+
+func bulkLoadTeamMembers(ctx context.Context, db sqlx.QueryerContext, teamID int64) ([]xsuportal.Contestant, error) {
+	var members []xsuportal.Contestant
+	err := sqlx.SelectContext(ctx, db, &members, "SELECT * FROM contestants WHERE team_id = ?", teamID)
+	return members, err
 }
 
 func (*ContestantService) RequestClarification(e echo.Context) error {
@@ -1387,6 +1397,30 @@ func halt(e echo.Context, code int, humanMessage string, err error) error {
 	return e.Blob(code, "application/vnd.google.protobuf; proto=xsuportal.proto.Error", res)
 }
 
+func makeClarificationPBWithMembers(ctx context.Context, db sqlx.QueryerContext, c *xsuportal.Clarification, t *xsuportal.Team, members []xsuportal.Contestant) (*resourcespb.Clarification, error) {
+	if nrEnabled {
+		defer newrelic.FromContext(ctx).StartSegment("makeClarificationPBWithMembers").End()
+	}
+	team, err := makeTeamPBWithMembers(ctx, db, t, false, members)
+	if err != nil {
+		return nil, fmt.Errorf("make team: %w", err)
+	}
+	pb := &resourcespb.Clarification{
+		Id:        c.ID,
+		TeamId:    c.TeamID,
+		Answered:  c.AnsweredAt.Valid,
+		Disclosed: c.Disclosed.Bool,
+		Question:  c.Question.String,
+		Answer:    c.Answer.String,
+		CreatedAt: timestamppb.New(c.CreatedAt),
+		Team:      team,
+	}
+	if c.AnsweredAt.Valid {
+		pb.AnsweredAt = timestamppb.New(c.AnsweredAt.Time)
+	}
+	return pb, nil
+}
+
 func makeClarificationPB(ctx context.Context, db sqlx.QueryerContext, c *xsuportal.Clarification, t *xsuportal.Team) (*resourcespb.Clarification, error) {
 	if nrEnabled {
 		defer newrelic.FromContext(ctx).StartSegment("makeClarificationPB").End()
@@ -1407,6 +1441,34 @@ func makeClarificationPB(ctx context.Context, db sqlx.QueryerContext, c *xsuport
 	}
 	if c.AnsweredAt.Valid {
 		pb.AnsweredAt = timestamppb.New(c.AnsweredAt.Time)
+	}
+	return pb, nil
+}
+
+func makeTeamPBWithMembers(ctx context.Context, db sqlx.QueryerContext, t *xsuportal.Team, detail bool, members []xsuportal.Contestant) (*resourcespb.Team, error) {
+	pb := &resourcespb.Team{
+		Id:        t.ID,
+		Name:      t.Name,
+		LeaderId:  t.LeaderID.String,
+		Withdrawn: t.Withdrawn,
+	}
+	if detail {
+		pb.Detail = &resourcespb.Team_TeamDetail{
+			EmailAddress: t.EmailAddress,
+			InviteToken:  t.InviteToken,
+		}
+	}
+	for _, member := range members {
+		pb.Members = append(pb.Members, makeContestantPB(&member))
+		pb.MemberIds = append(pb.MemberIds, member.ID)
+		if t.LeaderID.Valid && t.LeaderID.String == member.ID {
+			pb.Leader = makeContestantPB(&member)
+		}
+	}
+	if t.Student.Valid {
+		pb.Student = &resourcespb.Team_StudentStatus{
+			Status: t.Student.Bool,
+		}
 	}
 	return pb, nil
 }
