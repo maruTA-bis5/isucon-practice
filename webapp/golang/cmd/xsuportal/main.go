@@ -99,11 +99,13 @@ func main() {
 		go func() {
 			for {
 				stats := db.Stats()
-				nrApp.RecordCustomMetric("DBStats/MaxOpenConnection", float64(stats.MaxOpenConnections))
-				nrApp.RecordCustomMetric("DBStats/Idle", float64(stats.Idle))
-				nrApp.RecordCustomMetric("DBStats/OpenConnections", float64(stats.OpenConnections))
-				nrApp.RecordCustomMetric("DBStats/InUse", float64(stats.InUse))
-				nrApp.RecordCustomMetric("DBStats/WaitCount", float64(stats.WaitCount))
+				nrApp.RecordCustomEvent("DBStats", map[string]interface{}{
+					"MaxOpenConnection": stats.MaxOpenConnections,
+					"Idle":              stats.Idle,
+					"OpenConnections":   stats.OpenConnections,
+					"InUse":             stats.InUse,
+					"WaitCount":         stats.WaitCount,
+				})
 				time.Sleep(10 * time.Second)
 			}
 		}()
