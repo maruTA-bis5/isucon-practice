@@ -241,17 +241,16 @@ func (*AdminService) ListClarifications(e echo.Context) error {
 		return fmt.Errorf("query clarifications: %w", err)
 	}
 	res := &adminpb.ListClarificationsResponse{}
+	var teamIDs []int64
 	for _, clarification := range clarifications {
-		var team xsuportal.Team
-		err := db.GetContext(
-			e.Request().Context(),
-			&team,
-			"SELECT * FROM `teams` WHERE `id` = ? LIMIT 1",
-			clarification.TeamID,
-		)
-		if err != nil {
-			return fmt.Errorf("query team(id=%v, clarification=%v): %w", clarification.TeamID, clarification.ID, err)
-		}
+		teamIDs = append(teamIDs, clarification.TeamID)
+	}
+	teams, err := bulkLoadTeams(e, teamIDs)
+	if err != nil {
+		return fmt.Errorf("bulkLoad Teams: %w", err)
+	}
+	for _, clarification := range clarifications {
+		team := teams[clarification.TeamID]
 		c, err := makeClarificationPB(e.Request().Context(), db, &clarification, &team)
 		if err != nil {
 			return fmt.Errorf("make clarification: %w", err)
@@ -259,6 +258,26 @@ func (*AdminService) ListClarifications(e echo.Context) error {
 		res.Clarifications = append(res.Clarifications, c)
 	}
 	return writeProto(e, http.StatusOK, res)
+}
+
+func bulkLoadTeams(e echo.Context, teamIDs []int64) (map[int64]xsuportal.Team, error) {
+	if len(teamIDs) == 0 {
+		return make(map[int64]xsuportal.Team), nil
+	}
+	query, args, err := sqlx.In("SELECT * FROM teams WHERE id IN (?)", teamIDs)
+	if err != nil {
+		return nil, fmt.Errorf("bulkLoadTeams: %w", err)
+	}
+	var teams []xsuportal.Team
+	err = db.SelectContext(e.Request().Context(), &teams, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("bulkLoadTeams: %w", err)
+	}
+	teamById := make(map[int64]xsuportal.Team)
+	for _, t := range teams {
+		teamById[t.ID] = t
+	}
+	return teamById, nil
 }
 
 func (*AdminService) GetClarification(e echo.Context) error {
