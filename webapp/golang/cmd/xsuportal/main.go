@@ -1211,7 +1211,7 @@ func (*AudienceService) Dashboard(e echo.Context) error {
 	if err != nil {
 		return fmt.Errorf("make leaderboard: %w", err)
 	}
-	rdb.WithContext(e.Request().Context()).Set(e.Request().Context(), key, leaderboard.String(), 10*time.Second)
+	rdb.WithContext(e.Request().Context()).SetEX(e.Request().Context(), key, leaderboard.String(), 1*time.Second)
 
 	return writeProto(e, http.StatusOK, &audiencepb.DashboardResponse{
 		Leaderboard: leaderboard,
