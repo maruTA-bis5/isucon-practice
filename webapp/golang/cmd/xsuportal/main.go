@@ -47,7 +47,7 @@ const (
 )
 
 var db *sqlx.DB
-var notifier xsuportal.Notifier
+var notifier *xsuportal.Notifier
 var teamCapacity int
 var nrApp *newrelic.Application
 var nrEnabled bool = false
@@ -79,6 +79,8 @@ func main() {
 		teamCapacity = 10
 		panic(err)
 	}
+
+	notifier = xsuportal.NewNotifier(nrApp)
 
 	srv.Debug = util.GetEnv("DEBUG", "") != ""
 	srv.Server.Addr = fmt.Sprintf(":%v", util.GetEnv("PORT", "9292"))
@@ -435,7 +437,7 @@ func (*AdminService) RespondClarification(e echo.Context) error {
 		return fmt.Errorf("commit tx: %w", err)
 	}
 	updated := wasAnswered && wasDisclosed == clarification.Disclosed
-	if err := notifier.NotifyClarificationAnswered(db, &clarification, updated); err != nil {
+	if err := notifier.NotifyClarificationAnswered(e.Request().Context(), db, &clarification, updated); err != nil {
 		return fmt.Errorf("notify clarification answered: %w", err)
 	}
 	return writeProto(e, http.StatusOK, &adminpb.RespondClarificationResponse{

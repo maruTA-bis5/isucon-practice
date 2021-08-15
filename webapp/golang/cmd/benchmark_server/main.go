@@ -27,6 +27,8 @@ import (
 )
 
 var db *sqlx.DB
+var nrEnabled bool
+var notifier *xsuportal.Notifier
 
 type benchmarkQueueService struct {
 }
@@ -171,7 +173,7 @@ func (b *benchmarkReportService) ReportBenchmarkResult(srv bench.BenchmarkReport
 				if err := tx.Commit(); err != nil {
 					return fmt.Errorf("commit tx: %w", err)
 				}
-				if err := notifier.NotifyBenchmarkJobFinished(db, &job); err != nil {
+				if err := notifier.NotifyBenchmarkJobFinished(srv.Context(), db, &job); err != nil {
 					return fmt.Errorf("notify benchmark job finished: %w", err)
 				}
 			} else {
@@ -292,8 +294,9 @@ func main() {
 	var server *grpc.Server
 
 	nrLicense := util.GetEnv("NEWRELIC_LICENSE", "")
+	var nrApp *newrelic.Application
 	if nrLicense != "" {
-		nrApp, err := newrelic.NewApplication(
+		nrApp, err = newrelic.NewApplication(
 			newrelic.ConfigAppName("xsubench"),
 			newrelic.ConfigLicense(nrLicense),
 			newrelic.ConfigDebugLogger(os.Stdout),
@@ -308,9 +311,13 @@ func main() {
 			grpc.UnaryInterceptor(nrgrpc.UnaryServerInterceptor(nrApp)),
 			grpc.StreamInterceptor(nrgrpc.StreamServerInterceptor(nrApp)),
 		)
+		nrEnabled = true
 	} else {
 		server = grpc.NewServer()
+		nrEnabled = false
 	}
+
+	notifier = xsuportal.NewNotifier(nrApp)
 
 	queue := &benchmarkQueueService{}
 	report := &benchmarkReportService{}

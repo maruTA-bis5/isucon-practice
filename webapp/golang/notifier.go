@@ -1,6 +1,7 @@
 package xsuportal
 
 import (
+	"context"
 	"crypto/elliptic"
 	"crypto/x509"
 	"encoding/base64"
@@ -12,6 +13,7 @@ import (
 	"github.com/SherClockHolmes/webpush-go"
 	"github.com/golang/protobuf/proto"
 	"github.com/jmoiron/sqlx"
+	"github.com/newrelic/go-agent/v3/newrelic"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/isucon/isucon10-final/webapp/golang/proto/xsuportal/resources"
@@ -23,8 +25,13 @@ const (
 )
 
 type Notifier struct {
-	mu      sync.Mutex
-	options *webpush.Options
+	mu        sync.Mutex
+	options   *webpush.Options
+	nrEnabled bool
+}
+
+func NewNotifier(nrApp *newrelic.Application) *Notifier {
+	return &Notifier{nrEnabled: nrApp != nil}
 }
 
 func (n *Notifier) VAPIDKey() *webpush.Options {
@@ -56,7 +63,7 @@ func (n *Notifier) VAPIDKey() *webpush.Options {
 	return n.options
 }
 
-func (n *Notifier) NotifyClarificationAnswered(db sqlx.Ext, c *Clarification, updated bool) error {
+func (n *Notifier) NotifyClarificationAnswered(ctx context.Context, db sqlx.Ext, c *Clarification, updated bool) error {
 	var contestants []struct {
 		ID     string `db:"id"`
 		TeamID int64  `db:"team_id"`
@@ -91,7 +98,7 @@ func (n *Notifier) NotifyClarificationAnswered(db sqlx.Ext, c *Clarification, up
 				},
 			},
 		}
-		notification, err := n.notify(db, notificationPB, contestant.ID)
+		notification, err := n.notify(ctx, db, notificationPB, contestant.ID)
 		if err != nil {
 			return fmt.Errorf("notify: %w", err)
 		}
@@ -104,7 +111,7 @@ func (n *Notifier) NotifyClarificationAnswered(db sqlx.Ext, c *Clarification, up
 	return nil
 }
 
-func (n *Notifier) NotifyBenchmarkJobFinished(db sqlx.Ext, job *BenchmarkJob) error {
+func (n *Notifier) NotifyBenchmarkJobFinished(ctx context.Context, db sqlx.Ext, job *BenchmarkJob) error {
 	var contestants []struct {
 		ID     string `db:"id"`
 		TeamID int64  `db:"team_id"`
@@ -126,7 +133,7 @@ func (n *Notifier) NotifyBenchmarkJobFinished(db sqlx.Ext, job *BenchmarkJob) er
 				},
 			},
 		}
-		notification, err := n.notify(db, notificationPB, contestant.ID)
+		notification, err := n.notify(ctx, db, notificationPB, contestant.ID)
 		if err != nil {
 			return fmt.Errorf("notify: %w", err)
 		}
@@ -139,7 +146,10 @@ func (n *Notifier) NotifyBenchmarkJobFinished(db sqlx.Ext, job *BenchmarkJob) er
 	return nil
 }
 
-func (n *Notifier) notify(db sqlx.Ext, notificationPB *resources.Notification, contestantID string) (*Notification, error) {
+func (n *Notifier) notify(ctx context.Context, db sqlx.Ext, notificationPB *resources.Notification, contestantID string) (*Notification, error) {
+	if n.nrEnabled {
+		defer newrelic.FromContext(ctx).StartSegment("notify").End()
+	}
 	m, err := proto.Marshal(notificationPB)
 	if err != nil {
 		return nil, fmt.Errorf("marshal notification: %w", err)
@@ -166,5 +176,3 @@ func (n *Notifier) notify(db sqlx.Ext, notificationPB *resources.Notification, c
 	}
 	return &notification, nil
 }
-
-
