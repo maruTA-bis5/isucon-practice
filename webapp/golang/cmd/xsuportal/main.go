@@ -1189,6 +1189,12 @@ func (*AudienceService) ListTeams(e echo.Context) error {
 }
 
 func (*AudienceService) Dashboard(e echo.Context) error {
+	ifModifiedSince := e.Request().Header.Get("If-Modified-Since")
+	if t, err := time.Parse("Mon, 02 Jan 2006 15:04:05 MST", ifModifiedSince); err == nil && t.After(time.Now()) {
+		e.Response().WriteHeader(304)
+		return nil
+	}
+
 	leaderboard, err := makeLeaderboardPB(e, 0)
 	if err != nil {
 		return fmt.Errorf("make leaderboard: %w", err)
