@@ -63,13 +63,14 @@ func (n *Notifier) VAPIDKey() *webpush.Options {
 	return n.options
 }
 
-func (n *Notifier) NotifyClarificationAnswered(ctx context.Context, db sqlx.Ext, c *Clarification, updated bool) error {
+func (n *Notifier) NotifyClarificationAnswered(ctx context.Context, db *sqlx.DB, c *Clarification, updated bool) error {
 	var contestants []struct {
 		ID     string `db:"id"`
 		TeamID int64  `db:"team_id"`
 	}
 	if c.Disclosed.Valid && c.Disclosed.Bool {
-		err := sqlx.Select(
+		err := sqlx.SelectContext(
+			ctx,
 			db,
 			&contestants,
 			"SELECT `id`, `team_id` FROM `contestants` WHERE `team_id` IS NOT NULL",
@@ -78,7 +79,8 @@ func (n *Notifier) NotifyClarificationAnswered(ctx context.Context, db sqlx.Ext,
 			return fmt.Errorf("select all contestants: %w", err)
 		}
 	} else {
-		err := sqlx.Select(
+		err := sqlx.SelectContext(
+			ctx,
 			db,
 			&contestants,
 			"SELECT `id`, `team_id` FROM `contestants` WHERE `team_id` = ?",
@@ -111,12 +113,13 @@ func (n *Notifier) NotifyClarificationAnswered(ctx context.Context, db sqlx.Ext,
 	return nil
 }
 
-func (n *Notifier) NotifyBenchmarkJobFinished(ctx context.Context, db sqlx.Ext, job *BenchmarkJob) error {
+func (n *Notifier) NotifyBenchmarkJobFinished(ctx context.Context, db *sqlx.DB, job *BenchmarkJob) error {
 	var contestants []struct {
 		ID     string `db:"id"`
 		TeamID int64  `db:"team_id"`
 	}
-	err := sqlx.Select(
+	err := sqlx.SelectContext(
+		ctx,
 		db,
 		&contestants,
 		"SELECT `id`, `team_id` FROM `contestants` WHERE `team_id` = ?",
@@ -146,7 +149,7 @@ func (n *Notifier) NotifyBenchmarkJobFinished(ctx context.Context, db sqlx.Ext, 
 	return nil
 }
 
-func (n *Notifier) notify(ctx context.Context, db sqlx.Ext, notificationPB *resources.Notification, contestantID string) (*Notification, error) {
+func (n *Notifier) notify(ctx context.Context, db *sqlx.DB, notificationPB *resources.Notification, contestantID string) (*Notification, error) {
 	if n.nrEnabled {
 		defer newrelic.FromContext(ctx).StartSegment("notify").End()
 	}
@@ -155,7 +158,8 @@ func (n *Notifier) notify(ctx context.Context, db sqlx.Ext, notificationPB *reso
 		return nil, fmt.Errorf("marshal notification: %w", err)
 	}
 	encodedMessage := base64.StdEncoding.EncodeToString(m)
-	res, err := db.Exec(
+	res, err := db.ExecContext(
+		ctx,
 		"INSERT INTO `notifications` (`contestant_id`, `encoded_message`, `read`, `created_at`, `updated_at`) VALUES (?, ?, FALSE, NOW(6), NOW(6))",
 		contestantID,
 		encodedMessage,
@@ -165,7 +169,8 @@ func (n *Notifier) notify(ctx context.Context, db sqlx.Ext, notificationPB *reso
 	}
 	lastInsertID, _ := res.LastInsertId()
 	var notification Notification
-	err = sqlx.Get(
+	err = sqlx.GetContext(
+		ctx,
 		db,
 		&notification,
 		"SELECT * FROM `notifications` WHERE `id` = ? LIMIT 1",
