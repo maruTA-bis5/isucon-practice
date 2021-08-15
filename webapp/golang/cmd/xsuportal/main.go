@@ -95,7 +95,8 @@ func main() {
 	}
 
 	db, _ = xsuportal.GetDB()
-	db.SetMaxOpenConns(20)
+
+	db.SetMaxOpenConns(util.GetEnvInt("XSU_DB_MAX_CONN", 20))
 
 	srv.Use(middleware.Logger())
 	srv.Use(middleware.Recover())
