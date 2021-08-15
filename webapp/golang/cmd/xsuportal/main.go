@@ -1195,7 +1195,7 @@ func (*AudienceService) ListTeams(e echo.Context) error {
 }
 
 func (*AudienceService) Dashboard(e echo.Context) error {
-	key := strconv.Itoa(int(time.Now().Unix()))
+	key := strconv.Itoa(int(time.Now().Unix() / 1000))
 	cachedLeaderboard, err := rdb.WithContext(e.Request().Context()).Get(e.Request().Context(), key).Result()
 	if cachedLeaderboard != "" {
 		leaderboard := &resourcespb.Leaderboard{}
