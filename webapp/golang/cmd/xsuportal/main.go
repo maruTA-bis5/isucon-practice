@@ -1392,6 +1392,9 @@ func halt(e echo.Context, code int, humanMessage string, err error) error {
 }
 
 func makeClarificationPB(ctx context.Context, db sqlx.QueryerContext, c *xsuportal.Clarification, t *xsuportal.Team) (*resourcespb.Clarification, error) {
+	if nrEnabled {
+		defer newrelic.FromContext(ctx).StartSegment("makeClarificationPB").End()
+	}
 	team, err := makeTeamPB(ctx, db, t, false, true)
 	if err != nil {
 		return nil, fmt.Errorf("make team: %w", err)
