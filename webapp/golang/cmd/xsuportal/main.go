@@ -1023,7 +1023,7 @@ func (*RegistrationService) CreateTeam(e echo.Context) error {
 	}
 	_, err = conn.ExecContext(
 		ctx,
-		"INSERT INTO `teams` (`name`, `email_address`, `invite_token`, `created_at`) VALUES (?, ?, ? NOW(6))",
+		"INSERT INTO `teams` (`name`, `email_address`, `invite_token`, `created_at`) VALUES (?, ?, ?, NOW(6))",
 		req.TeamName,
 		req.EmailAddress,
 		inviteToken,
