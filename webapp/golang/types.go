@@ -76,7 +76,7 @@ type BenchmarkJob struct {
 
 func (b *BenchmarkJob) Score() int32 {
 	if b.ScoreRaw.Valid && b.ScoreDeduction.Valid {
-		return b.ScoreRaw.Int32 - b.ScoreRaw.Int32
+		return b.ScoreRaw.Int32 - b.ScoreDeduction.Int32
 	}
 	return 0
 }
