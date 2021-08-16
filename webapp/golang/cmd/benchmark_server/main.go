@@ -210,6 +210,9 @@ func (b *benchmarkReportService) saveAsFinished(ctx context.Context, db sqlx.Exe
 		return status.Errorf(codes.InvalidArgument, "marked_at is required")
 	}
 	markedAt := req.Result.MarkedAt.AsTime().Round(time.Microsecond)
+	if nrEnabled {
+		defer newrelic.FromContext(ctx).StartSegment("saveAsFinished").End()
+	}
 
 	result := req.Result
 	var raw, deduction sql.NullInt32
@@ -239,6 +242,9 @@ func (b *benchmarkReportService) saveAsFinished(ctx context.Context, db sqlx.Exe
 func (b *benchmarkReportService) saveAsRunning(ctx context.Context, db *sqlx.Tx, job *xsuportal.BenchmarkJob, req *bench.ReportBenchmarkResultRequest) error {
 	if req.Result.MarkedAt == nil {
 		return status.Errorf(codes.InvalidArgument, "marked_at is required")
+	}
+	if nrEnabled {
+		defer newrelic.FromContext(ctx).StartSegment(("saveAsRunning")).End()
 	}
 	var startedAt time.Time
 	if job.StartedAt.Valid {
