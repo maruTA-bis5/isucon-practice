@@ -469,6 +469,8 @@ func (*CommonService) GetCurrentSession(e echo.Context) error {
 		return fmt.Errorf("get current team: %w", err)
 	}
 	if currentTeam != nil {
+		// 実ベンチマーカーはここではnullを期待する
+		currentTeam.Student.Valid = false
 		res.Team, err = makeTeamPB(e.Request().Context(), db, currentTeam, true, true)
 		if err != nil {
 			return fmt.Errorf("make team: %w", err)
