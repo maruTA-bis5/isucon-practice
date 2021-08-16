@@ -239,6 +239,7 @@ func (b *benchmarkReportService) saveAsFinished(ctx context.Context, db *sqlx.Tx
 	if err != nil {
 		return fmt.Errorf("update benchmark job status: %w", err)
 	}
+	job.FinishedAt.Time = markedAt
 	err = b.updateTeamScore(ctx, db, job)
 	if err != nil {
 		return fmt.Errorf("update team stat: %w", err)
