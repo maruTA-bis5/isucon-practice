@@ -1684,7 +1684,7 @@ func makeLeaderboardPB(e echo.Context, teamID int64) (*resourcespb.Leaderboard, 
 			"  `team_score`.`finish_count` AS `finish_count`\n" +
 			"FROM\n" +
 			"  `teams`\n" +
-			"   LEFT JOIN `team_score` ON `team`.`id` = `team_score`.`team_id`\n" +
+			"   LEFT JOIN `team_score` ON `teams`.`id` = `team_score`.`team_id`\n" +
 			"ORDER BY\n" +
 			"  `latest_score` DESC,\n" +
 			"  `latest_score_marked_at` ASC\n"
