@@ -1554,7 +1554,7 @@ func getOrMakeTeamPB(ctx context.Context, db sqlx.QueryerContext, t *xsuportal.T
 	if nrEnabled {
 		defer newrelic.FromContext(ctx).StartSegment("getOrMakeTeamPB").End()
 	}
-	key := fmt.Sprintf("teamPB-%t-%t", detail, enableMembers)
+	key := fmt.Sprintf("teamPB-%d-%t-%t", t.ID, detail, enableMembers)
 	cached, err := rdb.WithContext(ctx).Get(ctx, key).Bytes()
 	if err != nil {
 		pb, err := makeTeamPB(ctx, db, t, detail, enableMembers)
