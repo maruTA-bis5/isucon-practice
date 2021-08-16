@@ -1221,6 +1221,15 @@ func (*RegistrationService) DeleteRegistration(e echo.Context) error {
 		if err != nil {
 			return fmt.Errorf("withdrawn contestant(id=%v): %w", contestant.ID, err)
 		}
+		_, err = tx.ExecContext(
+			e.Request().Context(),
+			"UPDATE teams SET student = (SELECT SUM(student) = COUNT(*) FROM contestant WHERE team_id = ?) WHERE id = ?",
+			team.ID,
+			team.ID,
+		)
+		if err != nil {
+			return fmt.Errorf("update team student flag by withdrawn contestant (teamid=%v): %w", team.ID, err)
+		}
 	}
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("commit tx: %w", err)
