@@ -266,22 +266,27 @@ func pollBenchmarkJob(ctx context.Context, db sqlx.QueryerContext) (*xsuportal.B
 		if err != nil {
 			return nil, fmt.Errorf("get benchmark job id: %w", err)
 		}
-		if len(popped) == 2 {
-			idStr := popped[1]
-			id, err := strconv.Atoi(idStr)
-			if err != nil {
-				return nil, fmt.Errorf("Invalid id stored in queue: id=%s, %w", idStr, err)
-			}
-			var job xsuportal.BenchmarkJob
-			err = sqlx.GetContext(ctx, db, &job, "SELECT * FROM benchmark_jobs WHERE id = ?", id)
-			if err == sql.ErrNoRows {
-				continue
-			}
-			if err != nil {
-				return nil, fmt.Errorf("get benchmark job: %w", err)
-			}
-			return &job, nil
+		var idStr string
+		if len(popped) == 1 {
+			idStr = popped[0]
+		} else if len(popped) == 2 {
+			idStr = popped[1]
+		} else {
+			continue
 		}
+		id, err := strconv.Atoi(idStr)
+		if err != nil {
+			return nil, fmt.Errorf("Invalid id stored in queue: id=%s, %w", idStr, err)
+		}
+		var job xsuportal.BenchmarkJob
+		err = sqlx.GetContext(ctx, db, &job, "SELECT * FROM benchmark_jobs WHERE id = ?", id)
+		if err == sql.ErrNoRows {
+			continue
+		}
+		if err != nil {
+			return nil, fmt.Errorf("get benchmark job: %w", err)
+		}
+		return &job, nil
 	}
 	return nil, nil
 }
