@@ -1023,7 +1023,7 @@ func (*RegistrationService) CreateTeam(e echo.Context) error {
 	}
 	_, err = conn.ExecContext(
 		ctx,
-		"INSERT INTO `teams` (`name`, `email_address`, `invite_token`, `created_at`) VALUES (?, ?, ?, NOW(6))",
+		"INSERT INTO `teams` (`name`, `email_address`, `invite_token`, `created_at`) VALUES (?, ?, ? NOW(6))",
 		req.TeamName,
 		req.EmailAddress,
 		inviteToken,
@@ -1056,8 +1056,9 @@ func (*RegistrationService) CreateTeam(e echo.Context) error {
 
 	_, err = conn.ExecContext(
 		ctx,
-		"UPDATE `teams` SET `leader_id` = ? WHERE `id` = ? LIMIT 1",
+		"UPDATE `teams` SET `leader_id` = ?, `student` = ? WHERE `id` = ? LIMIT 1",
 		contestant.ID,
+		req.IsStudent,
 		teamID,
 	)
 	if err != nil {
@@ -1175,6 +1176,12 @@ func (*RegistrationService) UpdateRegistration(e echo.Context) error {
 	if err != nil {
 		return fmt.Errorf("update contestant: %w", err)
 	}
+	_, err = tx.ExecContext(
+		e.Request().Context(),
+		"UPDATE `teams` SET `student` = (SELECT SUM(student) = COUNT(*) FROM contestants WHERE team_id = ?) WHERE id = ?",
+		team.ID,
+		team.ID,
+	)
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("commit tx: %w", err)
 	}
