@@ -310,7 +310,7 @@ func main() {
 	log.Print("[INFO] listen ", address)
 
 	db, _ = xsuportal.GetDB()
-	db.SetMaxOpenConns(10)
+	db.SetMaxOpenConns(util.GetEnvInt("XSU_DB_MAX_CONN", 20))
 
 	var server *grpc.Server
 
