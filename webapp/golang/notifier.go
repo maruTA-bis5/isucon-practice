@@ -164,7 +164,7 @@ func (n *Notifier) notify(ctx context.Context, db *sqlx.DB, notificationPB *reso
 		return nil, fmt.Errorf("marshal notification: %w", err)
 	}
 	encodedMessage := base64.StdEncoding.EncodeToString(m)
-	res, err := db.ExecContext(
+	/*res*/ _, err = db.ExecContext(
 		ctx,
 		"INSERT INTO `notifications` (`contestant_id`, `encoded_message`, `read`, `created_at`, `updated_at`) VALUES (?, ?, FALSE, NOW(6), NOW(6))",
 		contestantID,
@@ -173,17 +173,18 @@ func (n *Notifier) notify(ctx context.Context, db *sqlx.DB, notificationPB *reso
 	if err != nil {
 		return nil, fmt.Errorf("insert notification: %w", err)
 	}
-	lastInsertID, _ := res.LastInsertId()
-	var notification Notification
-	err = sqlx.GetContext(
-		ctx,
-		db,
-		&notification,
-		"SELECT * FROM `notifications` WHERE `id` = ? LIMIT 1",
-		lastInsertID,
-	)
+	// まだweb pushは未実装なので返さないでおく
+	// lastInsertID, _ := res.LastInsertId()
+	// var notification Notification
+	// err = sqlx.GetContext(
+	// 	ctx,
+	// 	db,
+	// 	&notification,
+	// 	"SELECT * FROM `notifications` WHERE `id` = ? LIMIT 1",
+	// 	lastInsertID,
+	// )
 	if err != nil {
 		return nil, fmt.Errorf("get inserted notification: %w", err)
 	}
-	return &notification, nil
+	return nil, nil
 }
