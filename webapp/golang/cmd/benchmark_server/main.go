@@ -205,7 +205,7 @@ func (b *benchmarkReportService) ReportBenchmarkResult(srv bench.BenchmarkReport
 	}
 }
 
-func (b *benchmarkReportService) saveAsFinished(ctx context.Context, db sqlx.ExecerContext, job *xsuportal.BenchmarkJob, req *bench.ReportBenchmarkResultRequest) error {
+func (b *benchmarkReportService) saveAsFinished(ctx context.Context, db *sqlx.Tx, job *xsuportal.BenchmarkJob, req *bench.ReportBenchmarkResultRequest) error {
 	if !job.StartedAt.Valid || job.FinishedAt.Valid {
 		return status.Errorf(codes.FailedPrecondition, "Job %v has already finished or has not started yet", req.JobId)
 	}
@@ -238,6 +238,53 @@ func (b *benchmarkReportService) saveAsFinished(ctx context.Context, db sqlx.Exe
 	)
 	if err != nil {
 		return fmt.Errorf("update benchmark job status: %w", err)
+	}
+	err = b.updateTeamScore(ctx, db, job)
+	if err != nil {
+		return fmt.Errorf("update team stat: %w", err)
+	}
+	return nil
+}
+
+func (b *benchmarkReportService) updateTeamScore(ctx context.Context, db *sqlx.Tx, job *xsuportal.BenchmarkJob) error {
+	if nrEnabled {
+		defer newrelic.FromContext(ctx).StartSegment("updateTeamScore").End()
+	}
+	latestScore := job.Score()
+	var score *xsuportal.TeamScore
+	err := db.GetContext(ctx, score, "SELECT * FROM team_score WHERE team_id = ? LIMIT 1 FOR UPDATE", job.TeamID)
+	if err == sql.ErrNoRows {
+		_, err := db.ExecContext(
+			ctx,
+			"INSERT INTO team_score(team_id, best_score, best_score_started_at, best_score_marked_at, latest_score, latest_score_started_at, latest_score_marked_at, finish_count) VALUES(?,?,?,?,?,?,?,1)",
+			job.TeamID,
+			latestScore,
+			job.StartedAt.Time,
+			job.FinishedAt.Time,
+			latestScore,
+			job.StartedAt.Time,
+			job.FinishedAt.Time,
+		)
+		if err != nil {
+			return fmt.Errorf("insert team score: %w", err)
+		}
+		return nil
+	}
+	score.UpdateScore(job)
+	_, err = db.ExecContext(
+		ctx,
+		"UPDATE team_score SET best_score = ?, best_score_started_at = ?, best_score_marked_at = ?, latest_score_started_at = ?, latest_score_marked_at = ?, finish_count = (SELECT COUNT(*) FROM benchmark_jobs WHERE team_id = ? AND finished_at IS NOT NULL) WHERE team_id = ?",
+		score.BestScore.Int64,
+		score.BestScoreStartedAt.Time,
+		score.BestScoreMarkedAt.Time,
+		score.LatestScore.Int64,
+		score.LatestScoreStartedAt.Time,
+		score.LatestScoreMarkedAt.Time,
+		job.TeamID,
+		job.TeamID,
+	)
+	if err != nil {
+		return fmt.Errorf("update team score for team[%d]: %w", job.TeamID, err)
 	}
 	return nil
 }

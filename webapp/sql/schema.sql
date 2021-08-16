@@ -28,12 +28,13 @@ DROP TABLE IF EXISTS `team_score`;
 CREATE TABLE `team_score` (
   `id` BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
   `team_id` BIGINT NOT NULL,
-  `best_score` INT NOT NULL DEFAULT 0,
+  `best_score` INT,
   `best_score_started_at` DATETIME(6),
   `best_score_marked_at` DATETIME(6),
-  `latest_score` INT NOT NULL DEFAULT 0,
+  `latest_score` INT,
   `latest_score_started_at` DATETIME(6),
   `latest_score_marked_at` DATETIME(6),
+  `finish_count` INT,
   UNIQUE KEY (`team_id`)
 ) ENGINE=InnoDB DEFAULT CHARACTER SET utf8mb4;
 

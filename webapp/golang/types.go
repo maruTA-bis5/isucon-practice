@@ -74,6 +74,13 @@ type BenchmarkJob struct {
 	UpdatedAt      time.Time      `db:"updated_at"`
 }
 
+func (b *BenchmarkJob) Score() int32 {
+	if b.ScoreRaw.Valid && b.ScoreDeduction.Valid {
+		return b.ScoreRaw.Int32 - b.ScoreRaw.Int32
+	}
+	return 0
+}
+
 type Notification struct {
 	ID             int64     `db:"id"`
 	ContestantID   string    `db:"contestant_id"`
@@ -116,4 +123,25 @@ func (t *LeaderBoardTeam) Team() *Team {
 		Withdrawn: t.Withdrawn,
 		Student:   t.Student,
 	}
+}
+
+type TeamScore struct {
+	ID                   int64         `db:"id"`
+	TeamID               int64         `db:"team_id"`
+	BestScore            sql.NullInt64 `db:"best_score"`
+	BestScoreStartedAt   sql.NullTime  `db:"best_score_started_at"`
+	BestScoreMarkedAt    sql.NullTime  `db:"best_score_marked_at"`
+	LatestScore          sql.NullInt64 `db:"latest_score"`
+	LatestScoreStartedAt sql.NullTime  `db:"latest_score_started_at"`
+	LatestScoreMarkedAt  sql.NullTime  `db:"latest_score_marked_at"`
+	FinishCount          sql.NullInt64 `db:"finish_count"`
+}
+
+func (t *TeamScore) UpdateScore(job *BenchmarkJob) {
+	if !t.BestScore.Valid && t.BestScore.Int64 < int64(job.Score()) {
+		t.BestScore.Int64 = int64(job.Score())
+	}
+	t.LatestScore.Int64 = int64(job.Score())
+	t.LatestScoreStartedAt.Time = job.StartedAt.Time
+	t.LatestScoreMarkedAt.Time = job.FinishedAt.Time
 }
