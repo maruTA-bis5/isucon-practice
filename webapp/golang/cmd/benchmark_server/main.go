@@ -10,6 +10,7 @@ import (
 	"net"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -263,7 +264,7 @@ const BENCH_JOBS_KEY = "benchmark_jobs"
 func pollBenchmarkJob(ctx context.Context, db sqlx.QueryerContext) (*xsuportal.BenchmarkJob, error) {
 	for i := 0; i < 10; i++ {
 		popped, err := rdb.WithContext(ctx).BRPop(ctx, 50*time.Millisecond, BENCH_JOBS_KEY).Result()
-		if err != nil {
+		if err != nil && !strings.Contains(err.Error(), "redis: null") {
 			return nil, fmt.Errorf("get benchmark job id: %w", err)
 		}
 		var idStr string
