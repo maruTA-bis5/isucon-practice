@@ -19,6 +19,7 @@ CREATE TABLE `teams` (
   `email_address` VARCHAR(255) NOT NULL,
   `invite_token` VARCHAR(255) NOT NULL,
   `withdrawn` TINYINT(1) DEFAULT FALSE,
+  `student` TINYINT(1) DEFAULT FALSE,
   `created_at` DATETIME(6) NOT NULL,
   UNIQUE KEY (`leader_id`)
 ) ENGINE=InnoDB DEFAULT CHARACTER SET utf8mb4;
