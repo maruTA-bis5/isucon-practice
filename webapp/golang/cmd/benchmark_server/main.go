@@ -202,7 +202,7 @@ func (b *benchmarkReportService) ReportBenchmarkResult(srv bench.BenchmarkReport
 	}
 }
 
-func (b *benchmarkReportService) saveAsFinished(ctx context.Context, db sqlx.Execer, job *xsuportal.BenchmarkJob, req *bench.ReportBenchmarkResultRequest) error {
+func (b *benchmarkReportService) saveAsFinished(ctx context.Context, db sqlx.ExecerContext, job *xsuportal.BenchmarkJob, req *bench.ReportBenchmarkResultRequest) error {
 	if !job.StartedAt.Valid || job.FinishedAt.Valid {
 		return status.Errorf(codes.FailedPrecondition, "Job %v has already finished or has not started yet", req.JobId)
 	}
@@ -219,7 +219,8 @@ func (b *benchmarkReportService) saveAsFinished(ctx context.Context, db sqlx.Exe
 		deduction.Valid = true
 		deduction.Int32 = int32(result.ScoreBreakdown.Deduction)
 	}
-	_, err := db.Exec(
+	_, err := db.ExecContext(
+		ctx,
 		"UPDATE `benchmark_jobs` SET `status` = ?, `score_raw` = ?, `score_deduction` = ?, `passed` = ?, `reason` = ?, `updated_at` = NOW(6), `finished_at` = ? WHERE `id` = ? LIMIT 1",
 		resources.BenchmarkJob_FINISHED,
 		raw,
