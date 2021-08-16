@@ -1555,17 +1555,18 @@ func getOrMakeTeamPB(ctx context.Context, db sqlx.QueryerContext, t *xsuportal.T
 		defer newrelic.FromContext(ctx).StartSegment("getOrMakeTeamPB").End()
 	}
 	key := fmt.Sprintf("teamPB-%t-%t", detail, enableMembers)
-	cached := rdb.WithContext(ctx).Get(ctx, key).String()
-	if cached == "" {
+	cached, err := rdb.WithContext(ctx).Get(ctx, key).Bytes()
+	if err != nil {
 		pb, err := makeTeamPB(ctx, db, t, detail, enableMembers)
 		if err != nil {
 			return nil, err
 		}
-		rdb.WithContext(ctx).Set(ctx, key, pb.String(), 1*time.Minute)
+		data, _ := proto.Marshal(pb)
+		rdb.WithContext(ctx).Set(ctx, key, data, 1*time.Minute)
 		return pb, nil
 	}
 	pb := &resourcespb.Team{}
-	err := proto.Unmarshal([]byte(cached), pb)
+	err = proto.Unmarshal(cached, pb)
 	if err != nil {
 		// illegal cache
 		rdb.WithContext(ctx).Del(ctx, key)
