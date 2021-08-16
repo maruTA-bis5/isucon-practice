@@ -274,7 +274,7 @@ func (b *benchmarkReportService) updateTeamScore(ctx context.Context, db *sqlx.T
 	score.UpdateScore(job)
 	_, err = db.ExecContext(
 		ctx,
-		"UPDATE team_score SET best_score = ?, best_score_started_at = ?, best_score_marked_at = ?, latest_score_started_at = ?, latest_score_marked_at = ?, finish_count = (SELECT COUNT(*) FROM benchmark_jobs WHERE team_id = ? AND finished_at IS NOT NULL) WHERE team_id = ?",
+		"UPDATE team_score SET best_score = ?, best_score_started_at = ?, best_score_marked_at = ?, latest_score = ?, latest_score_started_at = ?, latest_score_marked_at = ?, finish_count = (SELECT COUNT(*) FROM benchmark_jobs WHERE team_id = ? AND finished_at IS NOT NULL) WHERE team_id = ?",
 		score.BestScore.Int64,
 		score.BestScoreStartedAt.Time,
 		score.BestScoreMarkedAt.Time,
