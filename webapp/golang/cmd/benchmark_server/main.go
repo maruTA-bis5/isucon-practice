@@ -251,26 +251,8 @@ func (b *benchmarkReportService) updateTeamScore(ctx context.Context, db *sqlx.T
 	if nrEnabled {
 		defer newrelic.FromContext(ctx).StartSegment("updateTeamScore").End()
 	}
-	latestScore := job.Score()
 	score := &xsuportal.TeamScore{}
 	err := db.GetContext(ctx, score, "SELECT * FROM team_score WHERE team_id = ? LIMIT 1 FOR UPDATE", job.TeamID)
-	if err == sql.ErrNoRows {
-		_, err := db.ExecContext(
-			ctx,
-			"INSERT INTO team_score(team_id, best_score, best_score_started_at, best_score_marked_at, latest_score, latest_score_started_at, latest_score_marked_at, finish_count) VALUES(?,?,?,?,?,?,?,1)",
-			job.TeamID,
-			latestScore,
-			job.StartedAt.Time,
-			job.FinishedAt.Time,
-			latestScore,
-			job.StartedAt.Time,
-			job.FinishedAt.Time,
-		)
-		if err != nil {
-			return fmt.Errorf("insert team score: %w", err)
-		}
-		return nil
-	}
 	score.UpdateScore(job)
 	_, err = db.ExecContext(
 		ctx,

@@ -1068,6 +1068,15 @@ func (*RegistrationService) CreateTeam(e echo.Context) error {
 		return fmt.Errorf("update team: %w", err)
 	}
 
+	_, err = conn.ExecContext(
+		ctx,
+		"INSERT INTO team_score (team_id) VALUES (?)",
+		teamID,
+	)
+	if err != nil {
+		return fmt.Errorf("create team_score: %w", err)
+	}
+
 	return writeProto(e, http.StatusOK, &registrationpb.CreateTeamResponse{
 		TeamId: teamID,
 	})

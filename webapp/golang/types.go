@@ -138,7 +138,7 @@ type TeamScore struct {
 }
 
 func (t *TeamScore) UpdateScore(job *BenchmarkJob) {
-	if t.BestScore.Valid && t.BestScore.Int64 < int64(job.Score()) {
+	if !t.BestScore.Valid || t.BestScore.Int64 < int64(job.Score()) {
 		t.BestScore.Int64 = int64(job.Score())
 	}
 	t.LatestScore.Int64 = int64(job.Score())
