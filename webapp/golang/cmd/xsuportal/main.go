@@ -1100,11 +1100,17 @@ func (*RegistrationService) JoinTeam(e echo.Context) error {
 	if err != nil {
 		return fmt.Errorf("get team with lock: %w", err)
 	}
-	members, err := bulkLoadTeamMembers(e.Request().Context(), tx, req.TeamId)
+	var memberCount int
+	err = tx.GetContext(
+		e.Request().Context(),
+		&memberCount,
+		"SELECT COUNT(*) AS `cnt` FROM `contestants` WHERE `team_id` = ?",
+		req.TeamId,
+	)
 	if err != nil {
 		return fmt.Errorf("count team member: %w", err)
 	}
-	if len(members) >= 3 {
+	if memberCount >= 3 {
 		return halt(e, http.StatusBadRequest, "チーム人数の上限に達しています", nil)
 	}
 
@@ -1120,14 +1126,10 @@ func (*RegistrationService) JoinTeam(e echo.Context) error {
 	if err != nil {
 		return fmt.Errorf("update contestant: %w", err)
 	}
-	var studentTeam bool = req.IsStudent
-	for _, c := range members {
-		studentTeam = studentTeam && c.Student
-	}
 	_, err = tx.ExecContext(
 		e.Request().Context(),
-		"UPDATE teams SET student = ? WHERE id = ?",
-		studentTeam,
+		"UPDATE teams SET student = (SELECT Sum(student) = Count(*) FROM contestants WHERE team_id = ?) WHERE id = ?",
+		req.TeamId,
 		req.TeamId,
 	)
 	if err := tx.Commit(); err != nil {
