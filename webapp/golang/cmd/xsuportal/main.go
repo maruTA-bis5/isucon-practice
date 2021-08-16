@@ -1550,6 +1550,30 @@ func makeTeamPBWithMembers(ctx context.Context, db sqlx.QueryerContext, t *xsupo
 	return pb, nil
 }
 
+func getOrMakeTeamPB(ctx context.Context, db sqlx.QueryerContext, t *xsuportal.Team, detail bool, enableMembers bool) (*resourcespb.Team, error) {
+	if nrEnabled {
+		defer newrelic.FromContext(ctx).StartSegment("getOrMakeTeamPB").End()
+	}
+	key := fmt.Sprintf("teamPB-%t-%t", detail, enableMembers)
+	cached := rdb.WithContext(ctx).Get(ctx, key).String()
+	if cached == "" {
+		pb, err := makeTeamPB(ctx, db, t, detail, enableMembers)
+		if err != nil {
+			return nil, err
+		}
+		rdb.WithContext(ctx).Set(ctx, key, pb.String(), 1*time.Minute)
+		return pb, nil
+	}
+	pb := &resourcespb.Team{}
+	err := proto.Unmarshal([]byte(cached), pb)
+	if err != nil {
+		// illegal cache
+		rdb.WithContext(ctx).Del(ctx, key)
+		return makeTeamPB(ctx, db, t, detail, enableMembers)
+	}
+	return pb, nil
+
+}
 func makeTeamPB(ctx context.Context, db sqlx.QueryerContext, t *xsuportal.Team, detail bool, enableMembers bool) (*resourcespb.Team, error) {
 	if nrEnabled {
 		defer newrelic.FromContext(ctx).StartSegment("makeTeamPB").End()
@@ -1728,7 +1752,7 @@ func makeLeaderboardPB(e echo.Context, teamID int64) (*resourcespb.Leaderboard, 
 	}
 	pb := &resourcespb.Leaderboard{}
 	for _, team := range leaderboard {
-		t, _ := makeTeamPB(e.Request().Context(), db, team.Team(), false, false)
+		t, _ := getOrMakeTeamPB(e.Request().Context(), db, team.Team(), false, false)
 		item := &resourcespb.Leaderboard_LeaderboardItem{
 			Scores: teamGraphScores[team.ID],
 			BestScore: &resourcespb.Leaderboard_LeaderboardItem_LeaderboardScore{
