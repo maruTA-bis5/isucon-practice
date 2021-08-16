@@ -1524,8 +1524,10 @@ func makeTeamPBWithMembers(ctx context.Context, db sqlx.QueryerContext, t *xsupo
 			pb.Leader = makeContestantPB(&member)
 		}
 	}
-	pb.Student = &resourcespb.Team_StudentStatus{
-		Status: t.Student,
+	if t.Student.Valid {
+		pb.Student = &resourcespb.Team_StudentStatus{
+			Status: t.Student.Bool,
+		}
 	}
 	return pb, nil
 }
@@ -1563,8 +1565,10 @@ func makeTeamPB(ctx context.Context, db sqlx.QueryerContext, t *xsuportal.Team, 
 			pb.MemberIds = append(pb.MemberIds, member.ID)
 		}
 	}
-	pb.Student = &resourcespb.Team_StudentStatus{
-		Status: t.Student,
+	if t.Student.Valid {
+		pb.Student = &resourcespb.Team_StudentStatus{
+			Status: t.Student.Bool,
+		}
 	}
 	return pb, nil
 }
@@ -1722,7 +1726,7 @@ func makeLeaderboardPB(e echo.Context, teamID int64) (*resourcespb.Leaderboard, 
 			Team:        t,
 			FinishCount: team.FinishCount.Int64,
 		}
-		if team.Student {
+		if team.Student.Valid && team.Student.Bool {
 			pb.StudentTeams = append(pb.StudentTeams, item)
 		} else {
 			pb.GeneralTeams = append(pb.GeneralTeams, item)
