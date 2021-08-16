@@ -64,7 +64,7 @@ func (b *benchmarkQueueService) ReceiveBenchmarkJob(ctx context.Context, req *be
 			err = tx.GetContext(
 				ctx,
 				&gotLock,
-				"SELECT 1 FROM `benchmark_jobs` WHERE `id` = ? AND `status` = ? FOR UPDATE",
+				"SELECT 1 FROM `benchmark_jobs` WHERE `id` = ? AND `status` = ? ",
 				job.ID,
 				resources.BenchmarkJob_PENDING,
 			)
@@ -157,7 +157,7 @@ func (b *benchmarkReportService) ReportBenchmarkResult(srv bench.BenchmarkReport
 			err = tx.GetContext(
 				srv.Context(),
 				&job,
-				"SELECT * FROM `benchmark_jobs` WHERE `id` = ? AND `handle` = ? LIMIT 1 FOR UPDATE",
+				"SELECT * FROM `benchmark_jobs` WHERE `id` = ? AND `handle` = ? LIMIT 1 ",
 				req.JobId,
 				req.Handle,
 			)
