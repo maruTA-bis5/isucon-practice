@@ -171,9 +171,15 @@ func (b *benchmarkReportService) ReportBenchmarkResult(srv bench.BenchmarkReport
 			if err != nil {
 				return fmt.Errorf("get benchmark job: %w", err)
 			}
+			score := &xsuportal.TeamScore{}
+			err = db.GetContext(srv.Context(), score, "SELECT * FROM team_score WHERE team_id = ? LIMIT 1 FOR UPDATE", job.TeamID)
+			if err != nil {
+				return fmt.Errorf("get team score: %w", err)
+			}
+
 			if req.Result.Finished {
 				log.Printf("[DEBUG] %v: save as finished", req.JobId)
-				if err := b.saveAsFinished(srv.Context(), tx, &job, req); err != nil {
+				if err := b.saveAsFinished(srv.Context(), tx, &job, score, req); err != nil {
 					return err
 				}
 				if err := tx.Commit(); err != nil {
@@ -205,7 +211,7 @@ func (b *benchmarkReportService) ReportBenchmarkResult(srv bench.BenchmarkReport
 	}
 }
 
-func (b *benchmarkReportService) saveAsFinished(ctx context.Context, db *sqlx.Tx, job *xsuportal.BenchmarkJob, req *bench.ReportBenchmarkResultRequest) error {
+func (b *benchmarkReportService) saveAsFinished(ctx context.Context, db *sqlx.Tx, job *xsuportal.BenchmarkJob, score *xsuportal.TeamScore, req *bench.ReportBenchmarkResultRequest) error {
 	if !job.StartedAt.Valid || job.FinishedAt.Valid {
 		return status.Errorf(codes.FailedPrecondition, "Job %v has already finished or has not started yet", req.JobId)
 	}
@@ -243,21 +249,19 @@ func (b *benchmarkReportService) saveAsFinished(ctx context.Context, db *sqlx.Tx
 	job.FinishedAt.Valid = true
 	job.ScoreRaw = raw
 	job.ScoreDeduction = deduction
-	err = b.updateTeamScore(ctx, db, job)
+	err = b.updateTeamScore(ctx, db, job, score)
 	if err != nil {
 		return fmt.Errorf("update team stat: %w", err)
 	}
 	return nil
 }
 
-func (b *benchmarkReportService) updateTeamScore(ctx context.Context, db *sqlx.Tx, job *xsuportal.BenchmarkJob) error {
+func (b *benchmarkReportService) updateTeamScore(ctx context.Context, db *sqlx.Tx, job *xsuportal.BenchmarkJob, score *xsuportal.TeamScore) error {
 	if nrEnabled {
 		defer newrelic.FromContext(ctx).StartSegment("updateTeamScore").End()
 	}
-	score := &xsuportal.TeamScore{}
-	err := db.GetContext(ctx, score, "SELECT * FROM team_score WHERE team_id = ? LIMIT 1 FOR UPDATE", job.TeamID)
 	score.UpdateScore(job)
-	_, err = db.ExecContext(
+	_, err := db.ExecContext(
 		ctx,
 		"UPDATE team_score SET best_score = ?, best_score_started_at = ?, best_score_marked_at = ?, latest_score = ?, latest_score_started_at = ?, latest_score_marked_at = ?, finish_count = (SELECT COUNT(*) FROM benchmark_jobs WHERE team_id = ? AND finished_at IS NOT NULL) WHERE team_id = ?",
 		score.BestScore.Int64,
