@@ -4,6 +4,8 @@ MYSQL_USER=isucon
 MYSQL_PASS=isucon
 MYSQL_DATABASE=xsuportal
 
+REDIS_ADDR=isu1.t.isucon.dev
+
 BENCHMARK_SERVER_HOST=isu1.t.isucon.dev
 
 NEWRELIC_LICENSE=

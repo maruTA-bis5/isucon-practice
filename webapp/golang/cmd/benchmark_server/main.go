@@ -9,6 +9,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -17,6 +18,7 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	redis "github.com/go-redis/redis/v8"
 	"github.com/newrelic/go-agent/v3/integrations/nrgrpc"
 	"github.com/newrelic/go-agent/v3/newrelic"
 
@@ -29,6 +31,7 @@ import (
 var db *sqlx.DB
 var nrEnabled bool
 var notifier *xsuportal.Notifier
+var rdb *redis.Client
 
 type benchmarkQueueService struct {
 }
@@ -49,7 +52,7 @@ func (b *benchmarkQueueService) ReceiveBenchmarkJob(ctx context.Context, req *be
 			}
 			defer tx.Rollback()
 
-			job, err := pollBenchmarkJob(tx)
+			job, err := pollBenchmarkJob(ctx, tx)
 			if err != nil {
 				return false, fmt.Errorf("poll benchmark job: %w", err)
 			}
@@ -255,25 +258,30 @@ func (b *benchmarkReportService) saveAsRunning(ctx context.Context, db *sqlx.Tx,
 	return nil
 }
 
-func pollBenchmarkJob(db sqlx.Queryer) (*xsuportal.BenchmarkJob, error) {
+const BENCH_JOBS_KEY = "benchmark_jobs"
+
+func pollBenchmarkJob(ctx context.Context, db sqlx.QueryerContext) (*xsuportal.BenchmarkJob, error) {
 	for i := 0; i < 10; i++ {
-		if i >= 1 {
-			time.Sleep(50 * time.Millisecond)
-		}
-		var job xsuportal.BenchmarkJob
-		err := sqlx.Get(
-			db,
-			&job,
-			"SELECT * FROM `benchmark_jobs` WHERE `status` = ? ORDER BY `id` LIMIT 1",
-			resources.BenchmarkJob_PENDING,
-		)
-		if err == sql.ErrNoRows {
-			continue
-		}
+		popped, err := rdb.WithContext(ctx).BRPop(ctx, 50*time.Millisecond, BENCH_JOBS_KEY).Result()
 		if err != nil {
-			return nil, fmt.Errorf("get benchmark job: %w", err)
+			return nil, fmt.Errorf("get benchmark job id: %w", err)
 		}
-		return &job, nil
+		if len(popped) == 2 {
+			idStr := popped[1]
+			id, err := strconv.Atoi(idStr)
+			if err != nil {
+				return nil, fmt.Errorf("Invalid id stored in queue: id=%s, %w", idStr, err)
+			}
+			var job xsuportal.BenchmarkJob
+			err = sqlx.GetContext(ctx, db, &job, "SELECT * FROM benchmark_jobs WHERE id = ?", id)
+			if err == sql.ErrNoRows {
+				continue
+			}
+			if err != nil {
+				return nil, fmt.Errorf("get benchmark job: %w", err)
+			}
+			return &job, nil
+		}
 	}
 	return nil, nil
 }
@@ -316,6 +324,8 @@ func main() {
 		server = grpc.NewServer()
 		nrEnabled = false
 	}
+
+	rdb = xsuportal.GetRedisClient(nrEnabled)
 
 	notifier = xsuportal.NewNotifier(nrApp)
 

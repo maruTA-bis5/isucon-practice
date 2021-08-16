@@ -16,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	redis "github.com/go-redis/redis/v8"
 	"github.com/go-sql-driver/mysql"
 	"github.com/golang/protobuf/proto"
 	"github.com/gorilla/sessions"
@@ -48,6 +49,7 @@ const (
 )
 
 var db *sqlx.DB
+var rdb *redis.Client
 var notifier *xsuportal.Notifier
 var teamCapacity int
 var nrApp *newrelic.Application
@@ -99,6 +101,7 @@ func main() {
 	if nrEnabled {
 		dbprof.EnableDBStatsEventRecord(db, nrApp, 10*time.Second)
 	}
+	rdb = xsuportal.GetRedisClient(nrEnabled)
 
 	db.SetMaxOpenConns(util.GetEnvInt("XSU_DB_MAX_CONN", 20))
 
@@ -537,6 +540,7 @@ func (*ContestantService) EnqueueBenchmarkJob(e echo.Context) error {
 		return fmt.Errorf("commit tx: %w", err)
 	}
 	j := makeBenchmarkJobPB(&job)
+	rdb.WithContext(e.Request().Context()).RPush(e.Request().Context(), "benchmark_jobs", strconv.Itoa(int(job.ID)))
 	return writeProto(e, http.StatusOK, &contestantpb.EnqueueBenchmarkJobResponse{
 		Job: j,
 	})

@@ -1,5 +1,11 @@
 version: "3"
 services:
+  redis:
+    image: "redis:latest"
+    ports:
+      - "6379:6379"
+    networks: 
+      - isucon
   mysql:
     image: mysql:8.0
     environment:

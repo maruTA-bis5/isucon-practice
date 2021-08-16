@@ -1,9 +1,11 @@
 package xsuportal
 
 import (
+	redis "github.com/go-redis/redis/v8"
 	"github.com/go-sql-driver/mysql"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/newrelic/go-agent/v3/integrations/nrmysql"
+	nrredis "github.com/newrelic/go-agent/v3/integrations/nrredis-v8"
 
 	"github.com/isucon/isucon10-final/webapp/golang/util"
 )
@@ -22,4 +24,14 @@ func GetDB() (*sqlx.DB, error) {
 	mysqlConfig.InterpolateParams = true
 
 	return sqlx.Open("nrmysql", mysqlConfig.FormatDSN())
+}
+
+func GetRedisClient(nrEnabled bool) *redis.Client {
+	addr := util.GetEnv("REDIS_ADDR", "localhost:6379")
+	opts := &redis.Options{Addr: addr}
+	client := redis.NewClient(opts)
+	if nrEnabled {
+		client.AddHook(nrredis.NewHook(opts))
+	}
+	return client
 }
