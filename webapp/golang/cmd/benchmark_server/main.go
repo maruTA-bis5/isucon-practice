@@ -251,7 +251,7 @@ func (b *benchmarkReportService) updateTeamScore(ctx context.Context, db *sqlx.T
 		defer newrelic.FromContext(ctx).StartSegment("updateTeamScore").End()
 	}
 	latestScore := job.Score()
-	var score *xsuportal.TeamScore
+	score := &xsuportal.TeamScore{}
 	err := db.GetContext(ctx, score, "SELECT * FROM team_score WHERE team_id = ? LIMIT 1 FOR UPDATE", job.TeamID)
 	if err == sql.ErrNoRows {
 		_, err := db.ExecContext(
