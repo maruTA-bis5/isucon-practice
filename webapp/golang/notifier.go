@@ -64,6 +64,9 @@ func (n *Notifier) VAPIDKey() *webpush.Options {
 }
 
 func (n *Notifier) NotifyClarificationAnswered(ctx context.Context, db *sqlx.DB, c *Clarification, updated bool) error {
+	if n.nrEnabled {
+		defer newrelic.FromContext(ctx).StartSegment("NotifyClarificationAnswered").End()
+	}
 	var contestants []struct {
 		ID     string `db:"id"`
 		TeamID int64  `db:"team_id"`
@@ -114,6 +117,9 @@ func (n *Notifier) NotifyClarificationAnswered(ctx context.Context, db *sqlx.DB,
 }
 
 func (n *Notifier) NotifyBenchmarkJobFinished(ctx context.Context, db *sqlx.DB, job *BenchmarkJob) error {
+	if n.nrEnabled {
+		defer newrelic.FromContext(ctx).StartSegment("NotifyBenchmarkJobFinished").End()
+	}
 	var contestants []struct {
 		ID     string `db:"id"`
 		TeamID int64  `db:"team_id"`
