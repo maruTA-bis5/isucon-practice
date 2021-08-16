@@ -147,6 +147,9 @@ func (b *benchmarkReportService) ReportBenchmarkResult(srv bench.BenchmarkReport
 		}
 
 		err = func() error {
+			if nrEnabled {
+				defer newrelic.FromContext(srv.Context()).StartSegment("ReportBenchmarkResultInner").End()
+			}
 			tx, err := db.Beginx()
 			if err != nil {
 				return fmt.Errorf("begin tx: %w", err)
