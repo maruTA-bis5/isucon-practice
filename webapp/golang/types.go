@@ -140,6 +140,8 @@ type TeamScore struct {
 func (t *TeamScore) UpdateScore(job *BenchmarkJob) {
 	if !t.BestScore.Valid || t.BestScore.Int64 < int64(job.Score()) {
 		t.BestScore.Int64 = int64(job.Score())
+		t.BestScoreStartedAt.Time = job.StartedAt.Time
+		t.BestScoreMarkedAt.Time = job.FinishedAt.Time
 	}
 	t.LatestScore.Int64 = int64(job.Score())
 	t.LatestScoreStartedAt.Time = job.StartedAt.Time
