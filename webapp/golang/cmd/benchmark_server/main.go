@@ -262,7 +262,7 @@ const BENCH_JOBS_KEY = "benchmark_jobs"
 
 func pollBenchmarkJob(ctx context.Context, db sqlx.QueryerContext) (*xsuportal.BenchmarkJob, error) {
 	for i := 0; i < 10; i++ {
-		popped := rdb.WithContext(ctx).BRPop(ctx, 50*time.Millisecond, BENCH_JOBS_KEY).Val()
+		popped := rdb.WithContext(ctx).BRPop(ctx, 5*time.Second, BENCH_JOBS_KEY).Val()
 
 		var idStr string
 		if len(popped) == 1 {
