@@ -91,12 +91,22 @@ func getReservations(ctx context.Context, r *http.Request, s *Schedule) error {
 	ctx, span = tracer.Start(ctx, "getReservations")
 	defer span.End()
 
-	rows, err := db.QueryxContext(ctx, "SELECT * FROM `reservations` WHERE `schedule_id` = ?", s.ID)
+	var reservations []*Reservation
+	err := db.SelectContext(ctx, &reservations, "SELECT * FROM `reservations` WHERE `schedule_id` = ?", s.ID)
 	if err != nil {
 		return err
 	}
+	var userIDs []string
+	for _, r := range reservations {
+		userIDs = append(userIDs, r.UserID)
+	}
 	users := []*User{}
-	err = db.SelectContext(ctx, &users, "SELECT * FROM `users` WHERE `id` IN (SELECT `user_id` FROM `reservations` WHERE `schedule_id` = ?)", s.ID)
+	sql := "SELECT * FROM `users` WHERE `id` IN (?)"
+	query, params, err := sqlx.In(sql, userIDs)
+	if err != nil {
+		return err
+	}
+	err = db.SelectContext(ctx, &users, query, params...)
 	if err != nil {
 		return err
 	}
@@ -106,21 +116,11 @@ func getReservations(ctx context.Context, r *http.Request, s *Schedule) error {
 		userByID[user.ID] = user
 	}
 
-	defer rows.Close()
-
-	reserved := 0
-	s.Reservations = []*Reservation{}
-	for rows.Next() {
-		reservation := &Reservation{}
-		if err := rows.StructScan(reservation); err != nil {
-			return err
-		}
+	for _, reservation := range reservations {
 		reservation.User = getUser(ctx, r, userByID, reservation.UserID)
-
-		s.Reservations = append(s.Reservations, reservation)
-		reserved++
 	}
-	s.Reserved = reserved
+	s.Reservations = reservations
+	s.Reserved = len(reservations)
 
 	return nil
 }
