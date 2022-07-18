@@ -39,7 +39,7 @@ func init() {
 	pass := Getenv("DB_PASS", "isucon")
 	name := Getenv("DB_NAME", "isucon2021_prior")
 
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=true", user, pass, host, port, name)
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=true&interpolateParams=true", user, pass, host, port, name)
 
 	var err error
 	db, err = otelsqlx.Connect("mysql", dsn)
