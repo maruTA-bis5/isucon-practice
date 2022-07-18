@@ -24,3 +24,4 @@ CREATE TABLE `reservations` (
   `user_id`     VARCHAR(255) NOT NULL,
   `created_at`  DATETIME(6) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4;
+CREATE INDEX reservations_schedule_id_idx ON reservations(schedule_id);
