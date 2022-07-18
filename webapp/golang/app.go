@@ -137,19 +137,13 @@ func getReservationsCount(r *http.Request, s *Schedule) error {
 	ctx, span := tracer.Start(r.Context(), "getReservationsCount")
 	defer span.End()
 
-	// FIXME 件数しか使ってない
-	rows, err := db.QueryxContext(ctx, "SELECT * FROM `reservations` WHERE `schedule_id` = ?", s.ID)
+	var count int
+	err := db.GetContext(ctx, &count, "SELECT COUNT(*) FROM `reservations` WHERE `schedule_id` = ?", s.ID)
 	if err != nil {
 		return err
 	}
 
-	defer rows.Close()
-
-	reserved := 0
-	for rows.Next() {
-		reserved++
-	}
-	s.Reserved = reserved
+	s.Reserved = count
 
 	return nil
 }
