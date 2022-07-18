@@ -479,6 +479,10 @@ func findReservationCountByScheduleIDs(ctx context.Context, scheduleIDs []string
 	ctx, span = tracer.Start(ctx, "findReservationCountByScheduleIDs")
 	defer span.End()
 
+	if len(scheduleIDs) == 0 {
+		return map[string]int{}, nil
+	}
+
 	var counts []*ReservationCount
 	query := "SELECT `schedule_id`, COUNT(1) AS count FROM `reservations` WHERE `schedule_id` IN (?) GROUP BY `schedule_id`"
 	sql, params, err := sqlx.In(query, scheduleIDs)
