@@ -7,6 +7,7 @@ import (
 	"log"
 	"math/rand"
 	"os"
+	"strconv"
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -39,15 +40,19 @@ func init() {
 	user := Getenv("DB_USER", "isucon")
 	pass := Getenv("DB_PASS", "isucon")
 	name := Getenv("DB_NAME", "isucon2021_prior")
+	maxIdleConns, err := strconv.Atoi(Getenv("DB_MAX_IDLE_CONNS", "10"))
+	if err != nil {
+		maxIdleConns = 10
+	}
 
 	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=true&interpolateParams=true", user, pass, host, port, name)
 
-	var err error
 	db, err = otelsqlx.Connect("mysql", dsn)
 	if err != nil {
 		log.Fatal(err)
 	}
 	db.SetConnMaxLifetime(10 * time.Second)
+	db.SetMaxIdleConns(maxIdleConns)
 }
 
 type transactionHandler func(context.Context, *sqlx.Tx) error
