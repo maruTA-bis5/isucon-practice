@@ -13,7 +13,6 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/jmoiron/sqlx"
 	"github.com/oklog/ulid/v2"
-	"github.com/uptrace/opentelemetry-go-extra/otelsqlx"
 )
 
 var (
@@ -46,7 +45,7 @@ func init() {
 
 	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=true&interpolateParams=true", user, pass, host, port, name)
 
-	db, err = otelsqlx.Connect("mysql", dsn)
+	db, err = sqlx.Connect("mysql", dsn)
 	if err != nil {
 		log.Fatal(err)
 	}
