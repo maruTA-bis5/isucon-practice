@@ -87,18 +87,14 @@ func getReservations(r *http.Request, s *Schedule) error {
 	if err != nil {
 		return err
 	}
-	users, err := db.QueryxContext(r.Context(), "SELECT * FROM `users` WHERE `id` IN (SELECT `user_id` FROM `reservations` WHERE `schedule_id` = ?)", s.ID)
+	users := []*User{}
+	err = db.SelectContext(r.Context(), &users, "SELECT * FROM `users` WHERE `id` IN (SELECT `user_id` FROM `reservations` WHERE `schedule_id` = ?)", s.ID)
 	if err != nil {
 		return err
 	}
-	defer users.Close()
 
 	userByID := map[string]*User{}
-	for users.Next() {
-		user := &User{}
-		if err := users.StructScan(user); err != nil {
-			return err
-		}
+	for _, user := range users {
 		userByID[user.ID] = user
 	}
 
