@@ -17,12 +17,17 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/jmoiron/sqlx"
 	otelmux "go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 var (
 	publicDir string
 	fs        http.Handler
 )
+
+var tracer = otel.Tracer("webapp")
 
 type User struct {
 	ID        string    `db:"id" json:"id"`
@@ -49,16 +54,22 @@ type Reservation struct {
 	CreatedAt  time.Time `db:"created_at" json:"created_at"`
 }
 
-func getCurrentUser(r *http.Request) *User {
-	currentUser := r.Context().Value(currentUserKey)
+func getCurrentUser(ctx context.Context, r *http.Request) *User {
+	var span trace.Span
+	ctx, span = tracer.Start(ctx, "getCurrentUser")
+	defer span.End()
+
+	currentUser := ctx.Value(currentUserKey)
 	if currentUser != nil {
+		span.SetAttributes(attribute.Bool("CurrentUser.Cached", true))
 		return currentUser.(*User)
 	}
+	span.SetAttributes(attribute.Bool("CurrentUser.Cached", false))
 	uidCookie, err := r.Cookie("user_id")
 	if err != nil || uidCookie == nil {
 		return nil
 	}
-	row := db.QueryRowxContext(r.Context(), "SELECT * FROM `users` WHERE `id` = ? LIMIT 1", uidCookie.Value)
+	row := db.QueryRowxContext(ctx, "SELECT * FROM `users` WHERE `id` = ? LIMIT 1", uidCookie.Value)
 	user := &User{}
 	if err := row.StructScan(user); err != nil {
 		return nil
@@ -67,7 +78,7 @@ func getCurrentUser(r *http.Request) *User {
 }
 
 func requiredLogin(w http.ResponseWriter, r *http.Request) bool {
-	if getCurrentUser(r) != nil {
+	if getCurrentUser(r.Context(), r) != nil {
 		return true
 	}
 	sendErrorJSON(w, fmt.Errorf("login required"), 401)
@@ -75,20 +86,24 @@ func requiredLogin(w http.ResponseWriter, r *http.Request) bool {
 }
 
 func requiredStaffLogin(w http.ResponseWriter, r *http.Request) bool {
-	if getCurrentUser(r) != nil && getCurrentUser(r).Staff {
+	if getCurrentUser(r.Context(), r) != nil && getCurrentUser(r.Context(), r).Staff {
 		return true
 	}
 	sendErrorJSON(w, fmt.Errorf("login required"), 401)
 	return false
 }
 
-func getReservations(r *http.Request, s *Schedule) error {
-	rows, err := db.QueryxContext(r.Context(), "SELECT * FROM `reservations` WHERE `schedule_id` = ?", s.ID)
+func getReservations(ctx context.Context, r *http.Request, s *Schedule) error {
+	var span trace.Span
+	ctx, span = tracer.Start(ctx, "getReservations")
+	defer span.End()
+
+	rows, err := db.QueryxContext(ctx, "SELECT * FROM `reservations` WHERE `schedule_id` = ?", s.ID)
 	if err != nil {
 		return err
 	}
 	users := []*User{}
-	err = db.SelectContext(r.Context(), &users, "SELECT * FROM `users` WHERE `id` IN (SELECT `user_id` FROM `reservations` WHERE `schedule_id` = ?)", s.ID)
+	err = db.SelectContext(ctx, &users, "SELECT * FROM `users` WHERE `id` IN (SELECT `user_id` FROM `reservations` WHERE `schedule_id` = ?)", s.ID)
 	if err != nil {
 		return err
 	}
@@ -107,7 +122,7 @@ func getReservations(r *http.Request, s *Schedule) error {
 		if err := rows.StructScan(reservation); err != nil {
 			return err
 		}
-		reservation.User = getUser(r, userByID, reservation.UserID)
+		reservation.User = getUser(ctx, r, userByID, reservation.UserID)
 
 		s.Reservations = append(s.Reservations, reservation)
 		reserved++
@@ -118,7 +133,12 @@ func getReservations(r *http.Request, s *Schedule) error {
 }
 
 func getReservationsCount(r *http.Request, s *Schedule) error {
-	rows, err := db.QueryxContext(r.Context(), "SELECT * FROM `reservations` WHERE `schedule_id` = ?", s.ID)
+	var span trace.Span
+	ctx, span := tracer.Start(r.Context(), "getReservationsCount")
+	defer span.End()
+
+	// FIXME 件数しか使ってない
+	rows, err := db.QueryxContext(ctx, "SELECT * FROM `reservations` WHERE `schedule_id` = ?", s.ID)
 	if err != nil {
 		return err
 	}
@@ -134,9 +154,9 @@ func getReservationsCount(r *http.Request, s *Schedule) error {
 	return nil
 }
 
-func getUser(r *http.Request, userByID map[string]*User, id string) *User {
+func getUser(ctx context.Context, r *http.Request, userByID map[string]*User, id string) *User {
 	user := userByID[id]
-	if getCurrentUser(r) != nil && !getCurrentUser(r).Staff {
+	if getCurrentUser(ctx, r) != nil && !getCurrentUser(ctx, r).Staff {
 		user.Email = ""
 	}
 	return user
@@ -262,10 +282,14 @@ func initializeHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func sessionHandler(w http.ResponseWriter, r *http.Request) {
-	sendJSON(w, getCurrentUser(r), 200)
+	sendJSON(w, getCurrentUser(r.Context(), r), 200)
 }
 
 func signupHandler(w http.ResponseWriter, r *http.Request) {
+	var span trace.Span
+	ctx, span := tracer.Start(r.Context(), "signupHandler")
+	defer span.End()
+
 	if err := parseForm(r); err != nil {
 		sendErrorJSON(w, err, 500)
 		return
@@ -273,7 +297,7 @@ func signupHandler(w http.ResponseWriter, r *http.Request) {
 
 	user := &User{}
 
-	err := transaction(r.Context(), &sql.TxOptions{}, func(ctx context.Context, tx *sqlx.Tx) error {
+	err := transaction(ctx, &sql.TxOptions{}, func(ctx context.Context, tx *sqlx.Tx) error {
 		email := r.FormValue("email")
 		nickname := r.FormValue("nickname")
 		id := generateID(r.Context(), tx, "users")
@@ -300,6 +324,10 @@ func signupHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func loginHandler(w http.ResponseWriter, r *http.Request) {
+	var span trace.Span
+	ctx, span := tracer.Start(r.Context(), "loginHandler")
+	defer span.End()
+
 	if err := parseForm(r); err != nil {
 		sendErrorJSON(w, err, 500)
 		return
@@ -309,7 +337,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 	user := &User{}
 
 	if err := db.QueryRowxContext(
-		r.Context(),
+		ctx,
 		"SELECT * FROM `users` WHERE `email` = ? LIMIT 1",
 		email,
 	).StructScan(user); err != nil {
@@ -329,6 +357,10 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func createScheduleHandler(w http.ResponseWriter, r *http.Request) {
+	var span trace.Span
+	ctx, span := tracer.Start(r.Context(), "createScheduleHandler")
+	defer span.End()
+
 	if err := parseForm(r); err != nil {
 		sendErrorJSON(w, err, 500)
 		return
@@ -339,8 +371,8 @@ func createScheduleHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	schedule := &Schedule{}
-	err := transaction(r.Context(), &sql.TxOptions{}, func(ctx context.Context, tx *sqlx.Tx) error {
-		id := generateID(r.Context(), tx, "schedules")
+	err := transaction(ctx, &sql.TxOptions{}, func(ctx context.Context, tx *sqlx.Tx) error {
+		id := generateID(ctx, tx, "schedules")
 		title := r.PostFormValue("title")
 		capacity, _ := strconv.Atoi(r.PostFormValue("capacity"))
 
@@ -369,6 +401,10 @@ func createScheduleHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func createReservationHandler(w http.ResponseWriter, r *http.Request) {
+	var span trace.Span
+	ctx, span := tracer.Start(r.Context(), "createReservationHandler")
+	defer span.End()
+
 	if err := parseForm(r); err != nil {
 		sendErrorJSON(w, err, 500)
 		return
@@ -379,10 +415,10 @@ func createReservationHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	reservation := &Reservation{}
-	err := transaction(r.Context(), &sql.TxOptions{}, func(ctx context.Context, tx *sqlx.Tx) error {
-		id := generateID(r.Context(), tx, "schedules")
+	err := transaction(ctx, &sql.TxOptions{}, func(ctx context.Context, tx *sqlx.Tx) error {
+		id := generateID(ctx, tx, "schedules")
 		scheduleID := r.PostFormValue("schedule_id")
-		userID := getCurrentUser(r).ID
+		userID := getCurrentUser(ctx, r).ID
 
 		found := 0
 		tx.QueryRowContext(ctx, "SELECT 1 FROM `schedules` WHERE `id` = ? LIMIT 1 FOR UPDATE", scheduleID).Scan(&found)
@@ -445,8 +481,12 @@ func createReservationHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func schedulesHandler(w http.ResponseWriter, r *http.Request) {
+	var span trace.Span
+	ctx, span := tracer.Start(r.Context(), "schedulesHandler")
+	defer span.End()
+
 	schedules := []*Schedule{}
-	rows, err := db.QueryxContext(r.Context(), "SELECT * FROM `schedules` ORDER BY `id` DESC")
+	rows, err := db.QueryxContext(ctx, "SELECT * FROM `schedules` ORDER BY `id` DESC")
 	if err != nil {
 		sendErrorJSON(w, err, 500)
 		return
@@ -469,17 +509,21 @@ func schedulesHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func scheduleHandler(w http.ResponseWriter, r *http.Request) {
+	var span trace.Span
+	ctx, span := tracer.Start(r.Context(), "scheduleHandler")
+	defer span.End()
+
 	vars := mux.Vars(r)
 	id := vars["id"]
 
 	schedule := &Schedule{}
-	if err := db.QueryRowxContext(r.Context(), "SELECT * FROM `schedules` WHERE `id` = ? LIMIT 1", id).StructScan(schedule); err != nil {
+	if err := db.QueryRowxContext(ctx, "SELECT * FROM `schedules` WHERE `id` = ? LIMIT 1", id).StructScan(schedule); err != nil {
 
 		sendErrorJSON(w, err, 500)
 		return
 	}
 
-	if err := getReservations(r, schedule); err != nil {
+	if err := getReservations(ctx, r, schedule); err != nil {
 		sendErrorJSON(w, err, 500)
 		return
 	}
