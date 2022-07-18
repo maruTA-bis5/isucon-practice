@@ -402,7 +402,7 @@ func createReservationHandler(w http.ResponseWriter, r *http.Request) {
 
 	reservation := &Reservation{}
 	err := transaction(ctx, &sql.TxOptions{}, func(ctx context.Context, tx *sqlx.Tx) error {
-		id := generateID(ctx, tx, "schedules")
+		id := generateID(ctx, tx, "reservations")
 		scheduleID := r.PostFormValue("schedule_id")
 		userID := getCurrentUser(ctx, r).ID
 
