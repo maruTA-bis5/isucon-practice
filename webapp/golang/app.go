@@ -15,12 +15,8 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/jmoiron/sqlx"
 	otelmux "go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux"
-	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/trace"
 )
-
-var tracer = otel.Tracer("webapp")
 
 type User struct {
 	ID        string    `db:"id" json:"id"`
@@ -48,8 +44,7 @@ type Reservation struct {
 }
 
 func getCurrentUser(ctx context.Context, r *http.Request) *User {
-	var span trace.Span
-	ctx, span = tracer.Start(ctx, "getCurrentUser")
+	ctx, span := startSpan(ctx, "getCurrentUser")
 	defer span.End()
 
 	currentUser := ctx.Value(currentUserKey)
@@ -87,8 +82,7 @@ func requiredStaffLogin(w http.ResponseWriter, r *http.Request) bool {
 }
 
 func getReservations(ctx context.Context, r *http.Request, s *Schedule) error {
-	var span trace.Span
-	ctx, span = tracer.Start(ctx, "getReservations")
+	ctx, span := startSpan(ctx, "getReservations")
 	defer span.End()
 
 	var reservations []*Reservation
@@ -255,8 +249,7 @@ func sessionHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func signupHandler(w http.ResponseWriter, r *http.Request) {
-	var span trace.Span
-	ctx, span := tracer.Start(r.Context(), "signupHandler")
+	ctx, span := startSpan(r.Context(), "signupHandler")
 	defer span.End()
 
 	if err := parseForm(r); err != nil {
@@ -293,8 +286,7 @@ func signupHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func loginHandler(w http.ResponseWriter, r *http.Request) {
-	var span trace.Span
-	ctx, span := tracer.Start(r.Context(), "loginHandler")
+	ctx, span := startSpan(r.Context(), "loginHandler")
 	defer span.End()
 
 	if err := parseForm(r); err != nil {
@@ -326,8 +318,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func createScheduleHandler(w http.ResponseWriter, r *http.Request) {
-	var span trace.Span
-	ctx, span := tracer.Start(r.Context(), "createScheduleHandler")
+	ctx, span := startSpan(r.Context(), "createScheduleHandler")
 	defer span.End()
 
 	if err := parseForm(r); err != nil {
@@ -370,8 +361,7 @@ func createScheduleHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func createReservationHandler(w http.ResponseWriter, r *http.Request) {
-	var span trace.Span
-	ctx, span := tracer.Start(r.Context(), "createReservationHandler")
+	ctx, span := startSpan(r.Context(), "createReservationHandler")
 	defer span.End()
 
 	if err := parseForm(r); err != nil {
@@ -447,8 +437,7 @@ func createReservationHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func schedulesHandler(w http.ResponseWriter, r *http.Request) {
-	var span trace.Span
-	ctx, span := tracer.Start(r.Context(), "schedulesHandler")
+	ctx, span := startSpan(r.Context(), "schedulesHandler")
 	defer span.End()
 
 	schedules := []*Schedule{}
@@ -480,8 +469,7 @@ type ReservationCount struct {
 }
 
 func findReservationCountByScheduleIDs(ctx context.Context, scheduleIDs []string) (map[string]int, error) {
-	var span trace.Span
-	ctx, span = tracer.Start(ctx, "findReservationCountByScheduleIDs")
+	ctx, span := startSpan(ctx, "findReservationCountByScheduleIDs")
 	defer span.End()
 
 	if len(scheduleIDs) == 0 {
@@ -506,8 +494,7 @@ func findReservationCountByScheduleIDs(ctx context.Context, scheduleIDs []string
 }
 
 func scheduleHandler(w http.ResponseWriter, r *http.Request) {
-	var span trace.Span
-	ctx, span := tracer.Start(r.Context(), "scheduleHandler")
+	ctx, span := startSpan(r.Context(), "scheduleHandler")
 	defer span.End()
 
 	vars := mux.Vars(r)

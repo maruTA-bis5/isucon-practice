@@ -6,13 +6,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
-	"go.opentelemetry.io/otel/sdk/resource"
-	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	semconv "go.opentelemetry.io/otel/semconv/v1.10.0"
 )
 
 var (
@@ -41,26 +34,4 @@ func main() {
 	if err := srv.ListenAndServe(); err != nil {
 		log.Fatal(err)
 	}
-}
-
-func installTracerProvider(ctx context.Context) error {
-	client := otlptracegrpc.NewClient(otlptracegrpc.WithInsecure())
-	exporter, err := otlptrace.New(ctx, client)
-	if err != nil {
-		return err
-	}
-	tracerProvider := sdktrace.NewTracerProvider(
-		sdktrace.WithBatcher(exporter),
-		sdktrace.WithResource(newResource()),
-	)
-	otel.SetTracerProvider(tracerProvider)
-	return nil
-}
-
-func newResource() *resource.Resource {
-	return resource.NewWithAttributes(
-		semconv.SchemaURL,
-		semconv.ServiceNameKey.String("isucon11p"),
-		semconv.ServiceVersionKey.String("0.0.1"),
-	)
 }

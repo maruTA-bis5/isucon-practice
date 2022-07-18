@@ -14,7 +14,6 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/oklog/ulid/v2"
 	"github.com/uptrace/opentelemetry-go-extra/otelsqlx"
-	"go.opentelemetry.io/otel/trace"
 )
 
 var (
@@ -72,8 +71,7 @@ func transaction(ctx context.Context, opts *sql.TxOptions, handler transactionHa
 }
 
 func generateID(ctx context.Context, tx *sqlx.Tx, table string) string {
-	var span trace.Span
-	ctx, span = tracer.Start(ctx, "generateID")
+	ctx, span := startSpan(ctx, "generateID")
 	defer span.End()
 
 	id := ulid.MustNew(ulid.Timestamp(time.Now()), entropy).String()
