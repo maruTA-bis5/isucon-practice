@@ -12,6 +12,7 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/jmoiron/sqlx"
 	"github.com/oklog/ulid/v2"
+	"github.com/uptrace/opentelemetry-go-extra/otelsqlx"
 )
 
 var (
@@ -41,7 +42,7 @@ func init() {
 	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=true", user, pass, host, port, name)
 
 	var err error
-	db, err = sqlx.Connect("mysql", dsn)
+	db, err = otelsqlx.Connect("mysql", dsn)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -64,11 +65,11 @@ func transaction(ctx context.Context, opts *sql.TxOptions, handler transactionHa
 	}
 }
 
-func generateID(tx *sqlx.Tx, table string) string {
+func generateID(ctx context.Context, tx *sqlx.Tx, table string) string {
 	id := ulid.MustNew(ulid.Timestamp(time.Now()), entropy).String()
 	for {
 		found := 0
-		if err := tx.QueryRow(fmt.Sprintf("SELECT 1 FROM `%s` WHERE `id` = ? LIMIT 1", table), id).Scan(&found); err != nil {
+		if err := tx.QueryRowContext(ctx, fmt.Sprintf("SELECT 1 FROM `%s` WHERE `id` = ? LIMIT 1", table), id).Scan(&found); err != nil {
 			if err == sql.ErrNoRows {
 				break
 			}

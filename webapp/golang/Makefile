@@ -14,3 +14,6 @@ bin/webapp: ${SRC}
 .PHONY: run
 run: build
 	@./bin/webapp
+
+tidy:
+	@go mod tidy

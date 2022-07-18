@@ -16,6 +16,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/jmoiron/sqlx"
+	otelmux "go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux"
 )
 
 var (
@@ -141,6 +142,8 @@ func parseForm(r *http.Request) error {
 func serveMux() http.Handler {
 	router := mux.NewRouter()
 
+	router.Use(otelmux.Middleware("webapp"))
+
 	router.HandleFunc("/initialize", initializeHandler).Methods("POST")
 	router.HandleFunc("/api/session", sessionHandler).Methods("GET")
 	router.HandleFunc("/api/signup", signupHandler).Methods("POST")
@@ -206,7 +209,7 @@ func initializeHandler(w http.ResponseWriter, r *http.Request) {
 			return err
 		}
 
-		id := generateID(tx, "users")
+		id := generateID(r.Context(), tx, "users")
 		if _, err := tx.ExecContext(
 			ctx,
 			"INSERT INTO `users` (`id`, `email`, `nickname`, `staff`, `created_at`) VALUES (?, ?, ?, true, NOW(6))",
@@ -241,7 +244,7 @@ func signupHandler(w http.ResponseWriter, r *http.Request) {
 	err := transaction(r.Context(), &sql.TxOptions{}, func(ctx context.Context, tx *sqlx.Tx) error {
 		email := r.FormValue("email")
 		nickname := r.FormValue("nickname")
-		id := generateID(tx, "users")
+		id := generateID(r.Context(), tx, "users")
 
 		if _, err := tx.ExecContext(
 			ctx,
@@ -305,7 +308,7 @@ func createScheduleHandler(w http.ResponseWriter, r *http.Request) {
 
 	schedule := &Schedule{}
 	err := transaction(r.Context(), &sql.TxOptions{}, func(ctx context.Context, tx *sqlx.Tx) error {
-		id := generateID(tx, "schedules")
+		id := generateID(r.Context(), tx, "schedules")
 		title := r.PostFormValue("title")
 		capacity, _ := strconv.Atoi(r.PostFormValue("capacity"))
 
@@ -345,7 +348,7 @@ func createReservationHandler(w http.ResponseWriter, r *http.Request) {
 
 	reservation := &Reservation{}
 	err := transaction(r.Context(), &sql.TxOptions{}, func(ctx context.Context, tx *sqlx.Tx) error {
-		id := generateID(tx, "schedules")
+		id := generateID(r.Context(), tx, "schedules")
 		scheduleID := r.PostFormValue("schedule_id")
 		userID := getCurrentUser(r).ID
 
