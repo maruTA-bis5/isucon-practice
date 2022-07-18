@@ -125,22 +125,6 @@ func getReservations(ctx context.Context, r *http.Request, s *Schedule) error {
 	return nil
 }
 
-func getReservationsCount(r *http.Request, s *Schedule) error {
-	var span trace.Span
-	ctx, span := tracer.Start(r.Context(), "getReservationsCount")
-	defer span.End()
-
-	var count int
-	err := db.GetContext(ctx, &count, "SELECT COUNT(*) FROM `reservations` WHERE `schedule_id` = ?", s.ID)
-	if err != nil {
-		return err
-	}
-
-	s.Reserved = count
-
-	return nil
-}
-
 func getUser(ctx context.Context, r *http.Request, userByID map[string]*User, id string) *User {
 	user := userByID[id]
 	if getCurrentUser(ctx, r) != nil && !getCurrentUser(ctx, r).Staff {
@@ -463,26 +447,53 @@ func schedulesHandler(w http.ResponseWriter, r *http.Request) {
 	defer span.End()
 
 	schedules := []*Schedule{}
-	rows, err := db.QueryxContext(ctx, "SELECT * FROM `schedules` ORDER BY `id` DESC")
+	err := db.SelectContext(ctx, &schedules, "SELECT * FROM `schedules` ORDER BY `id` DESC")
 	if err != nil {
 		sendErrorJSON(w, err, 500)
 		return
 	}
+	scheduleIDs := []string{}
+	for _, s := range schedules {
+		scheduleIDs = append(scheduleIDs, s.ID)
+	}
 
-	for rows.Next() {
-		schedule := &Schedule{}
-		if err := rows.StructScan(schedule); err != nil {
-			sendErrorJSON(w, err, 500)
-			return
-		}
-		if err := getReservationsCount(r, schedule); err != nil {
-			sendErrorJSON(w, err, 500)
-			return
-		}
-		schedules = append(schedules, schedule)
+	resCountByID, err := findReservationCountByScheduleIDs(ctx, scheduleIDs)
+	if err != nil {
+		sendErrorJSON(w, err, 500)
+	}
+
+	for _, schedule := range schedules {
+		schedule.Reserved = resCountByID[schedule.ID]
 	}
 
 	sendJSON(w, schedules, 200)
+}
+
+type ReservationCount struct {
+	ScheduleID string `db:"schedule_id"`
+	Count      int    `db:"count"`
+}
+
+func findReservationCountByScheduleIDs(ctx context.Context, scheduleIDs []string) (map[string]int, error) {
+	var span trace.Span
+	ctx, span = tracer.Start(ctx, "findReservationCountByScheduleIDs")
+	defer span.End()
+
+	var counts []*ReservationCount
+	query := "SELECT `schedule_id`, COUNT(1) AS count FROM `reservations` WHERE `schedule_id` IN (?)"
+	sql, params, err := sqlx.In(query, scheduleIDs)
+	if err != nil {
+		return nil, err
+	}
+	err = db.SelectContext(ctx, &counts, sql, params...)
+	if err != nil {
+		return nil, err
+	}
+	countByScheduleID := map[string]int{}
+	for _, c := range counts {
+		countByScheduleID[c.ScheduleID] = c.Count
+	}
+	return countByScheduleID, nil
 }
 
 func scheduleHandler(w http.ResponseWriter, r *http.Request) {
