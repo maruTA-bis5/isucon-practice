@@ -160,13 +160,13 @@ func serveMux() http.Handler {
 	router.Use(otelmux.Middleware("webapp"))
 
 	router.HandleFunc("/initialize", initializeHandler).Methods("POST")
-	router.HandleFunc("/api/session", sessionHandler).Methods("GET")
+	router.HandleFunc("/api/session", withCurrentUser(sessionHandler)).Methods("GET")
 	router.HandleFunc("/api/signup", signupHandler).Methods("POST")
 	router.HandleFunc("/api/login", loginHandler).Methods("POST")
-	router.HandleFunc("/api/schedules", createScheduleHandler).Methods("POST")
+	router.HandleFunc("/api/schedules", withCurrentUser(createScheduleHandler)).Methods("POST")
 	router.HandleFunc("/api/reservations", withCurrentUser(createReservationHandler)).Methods("POST")
 	router.HandleFunc("/api/schedules", schedulesHandler).Methods("GET")
-	router.HandleFunc("/api/schedules/{id}", scheduleHandler).Methods("GET")
+	router.HandleFunc("/api/schedules/{id}", withCurrentUser(scheduleHandler)).Methods("GET")
 
 	dir, err := filepath.Abs(filepath.Join(filepath.Dir(os.Args[0]), "..", "public"))
 	if err != nil {
