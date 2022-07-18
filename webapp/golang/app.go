@@ -286,7 +286,7 @@ func signupHandler(w http.ResponseWriter, r *http.Request) {
 	err := transaction(ctx, &sql.TxOptions{}, func(ctx context.Context, tx *sqlx.Tx) error {
 		email := r.FormValue("email")
 		nickname := r.FormValue("nickname")
-		id := generateID(r.Context(), tx, "users")
+		id := generateID(ctx, tx, "users")
 
 		if _, err := tx.ExecContext(
 			ctx,
