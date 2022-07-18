@@ -415,21 +415,16 @@ func createReservationHandler(w http.ResponseWriter, r *http.Request) {
 		userID := getCurrentUser(ctx, r).ID
 
 		found := 0
-		var schedule *Schedule
-		err := tx.GetContext(ctx, &schedule, "SELECT * FROM `schedules` WHERE `id` = ? LIMIT 1 FOR UPDATE", scheduleID)
-		if err == sql.ErrNoRows {
+		tx.QueryRowContext(ctx, "SELECT 1 FROM `schedules` WHERE `id` = ? LIMIT 1 FOR UPDATE", scheduleID).Scan(&found)
+		if found != 1 {
 			return sendErrorJSON(w, fmt.Errorf("schedule not found"), 403)
 		}
-		if err != nil {
-			return sendErrorJSON(w, err, 500)
-		}
 
-		// userID = getCurrentUser().IDなのだから必ず存在する(ユーザ削除APIがないから削除されることもない)
-		// found = 0
-		// tx.QueryRowContext(ctx, "SELECT 1 FROM `users` WHERE `id` = ? LIMIT 1", userID).Scan(&found)
-		// if found != 1 {
-		// 	return sendErrorJSON(w, fmt.Errorf("user not found"), 403)
-		// }
+		found = 0
+		tx.QueryRowContext(ctx, "SELECT 1 FROM `users` WHERE `id` = ? LIMIT 1", userID).Scan(&found)
+		if found != 1 {
+			return sendErrorJSON(w, fmt.Errorf("user not found"), 403)
+		}
 
 		found = 0
 		tx.QueryRowContext(ctx, "SELECT 1 FROM `reservations` WHERE `schedule_id` = ? AND `user_id` = ? LIMIT 1", scheduleID, userID).Scan(&found)
@@ -437,12 +432,18 @@ func createReservationHandler(w http.ResponseWriter, r *http.Request) {
 			return sendErrorJSON(w, fmt.Errorf("already taken"), 403)
 		}
 
-		capacity := schedule.Capacity
+		capacity := 0
+		if err := tx.QueryRowContext(ctx, "SELECT `capacity` FROM `schedules` WHERE `id` = ? LIMIT 1", scheduleID).Scan(&capacity); err != nil {
+			return sendErrorJSON(w, err, 500)
+		}
 
-		var reserved int
-		err = tx.GetContext(ctx, &reserved, "SELECT COUNT(*) FROM `reservations` WHERE `schedule_id` = ?", scheduleID)
+		rows, err := tx.QueryContext(ctx, "SELECT * FROM `reservations` WHERE `schedule_id` = ?", scheduleID)
 		if err != nil && err != sql.ErrNoRows {
 			return sendErrorJSON(w, err, 500)
+		}
+		reserved := 0
+		for rows.Next() {
+			reserved++
 		}
 
 		if reserved >= capacity {
