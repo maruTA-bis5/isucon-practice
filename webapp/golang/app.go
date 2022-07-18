@@ -107,7 +107,7 @@ func getReservations(r *http.Request, s *Schedule) error {
 		if err := rows.StructScan(reservation); err != nil {
 			return err
 		}
-		reservation.User = userByID[reservation.UserID]
+		reservation.User = getUser(r, userByID, reservation.UserID)
 
 		s.Reservations = append(s.Reservations, reservation)
 		reserved++
@@ -132,6 +132,14 @@ func getReservationsCount(r *http.Request, s *Schedule) error {
 	s.Reserved = reserved
 
 	return nil
+}
+
+func getUser(r *http.Request, userByID map[string]*User, id string) *User {
+	user := userByID[id]
+	if getCurrentUser(r) != nil && !getCurrentUser(r).Staff {
+		user.Email = ""
+	}
+	return user
 }
 
 func parseForm(r *http.Request) error {
