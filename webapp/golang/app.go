@@ -7,8 +7,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -19,11 +17,6 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
-)
-
-var (
-	publicDir string
-	fs        http.Handler
 )
 
 var tracer = otel.Tracer("webapp")
@@ -177,12 +170,12 @@ func serveMux() http.Handler {
 	router.HandleFunc("/api/schedules", schedulesHandler).Methods("GET")
 	router.HandleFunc("/api/schedules/{id}", withCurrentUser(scheduleHandler)).Methods("GET")
 
-	dir, err := filepath.Abs(filepath.Join(filepath.Dir(os.Args[0]), "..", "public"))
-	if err != nil {
-		log.Fatal(err)
-	}
-	publicDir = dir
-	fs = http.FileServer(http.Dir(publicDir))
+	// dir, err := filepath.Abs(filepath.Join(filepath.Dir(os.Args[0]), "..", "public"))
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+	// publicDir = dir
+	// fs = http.FileServer(http.Dir(publicDir))
 
 	router.PathPrefix("/").HandlerFunc(htmlHandler)
 
@@ -523,27 +516,10 @@ func scheduleHandler(w http.ResponseWriter, r *http.Request) {
 
 func htmlHandler(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path
+	if path == "" {
+		path = "index.html"
+	}
 
 	w.Header().Set("X-Accel-Redirect", "/files/"+path)
 	w.WriteHeader(200)
-
-	// realpath := filepath.Join(publicDir, path)
-
-	// if stat, err := os.Stat(realpath); !os.IsNotExist(err) && !stat.IsDir() {
-	// 	fs.ServeHTTP(w, r)
-	// 	return
-	// } else {
-	// 	realpath = filepath.Join(publicDir, "index.html")
-	// }
-
-	// file, err := os.Open(realpath)
-	// if err != nil {
-	// 	sendErrorJSON(w, err, 500)
-	// 	return
-	// }
-	// defer file.Close()
-
-	// w.Header().Set("Content-Type", "text/html; chartset=utf-8")
-	// w.WriteHeader(200)
-	// io.Copy(w, file)
 }
