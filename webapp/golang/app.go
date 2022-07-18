@@ -520,6 +520,6 @@ func htmlHandler(w http.ResponseWriter, r *http.Request) {
 		path = "index.html"
 	}
 
-	w.Header().Set("X-Accel-Redirect", "/files/"+path)
+	w.Header().Set("X-Accel-Redirect", "/files"+path)
 	w.WriteHeader(200)
 }
