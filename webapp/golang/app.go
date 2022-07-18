@@ -517,7 +517,7 @@ func scheduleHandler(w http.ResponseWriter, r *http.Request) {
 func htmlHandler(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path
 	if path == "" || path == "/" {
-		path = "index.html"
+		path = "/index.html"
 	}
 
 	w.Header().Set("X-Accel-Redirect", "/files"+path)
