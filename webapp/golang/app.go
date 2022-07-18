@@ -96,6 +96,11 @@ func getReservations(ctx context.Context, r *http.Request, s *Schedule) error {
 	if err != nil {
 		return err
 	}
+	if len(reservations) == 0 {
+		s.Reservations = reservations
+		s.Reserved = 0
+		return nil
+	}
 	var userIDs []string
 	for _, r := range reservations {
 		userIDs = append(userIDs, r.UserID)
