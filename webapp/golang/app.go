@@ -33,7 +33,7 @@ type Schedule struct {
 	ID           string         `db:"id" json:"id"`
 	Title        string         `db:"title" json:"title"`
 	Capacity     int            `db:"capacity" json:"capacity"`
-	Left         int            `db:"left"`
+	Left         int            `db:"capacity"`
 	Reserved     int            `db:"reserved" json:"reserved"`
 	Reservations []*Reservation `db:"reservations" json:"reservations"`
 	CreatedAt    time.Time      `db:"created_at" json:"created_at"`
