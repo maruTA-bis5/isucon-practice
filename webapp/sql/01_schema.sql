@@ -8,7 +8,6 @@ CREATE TABLE `users` (
   `staff`      BOOLEAN NOT NULL DEFAULT false,
   `created_at` DATETIME(6) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4;
-CREATE UNIQUE INDEX users_id_pk ON users (id);
 
 DROP TABLE IF EXISTS `schedules`;
 CREATE TABLE `schedules` (
@@ -17,7 +16,6 @@ CREATE TABLE `schedules` (
   `capacity`   INT UNSIGNED NOT NULL DEFAULT 0,
   `created_at` DATETIME(6) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4;
-CREATE UNIQUE INDEX schedules_id_ok ON schedules(id);
 
 DROP TABLE IF EXISTS `reservations`;
 CREATE TABLE `reservations` (
@@ -26,4 +24,3 @@ CREATE TABLE `reservations` (
   `user_id`     VARCHAR(255) NOT NULL,
   `created_at`  DATETIME(6) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4;
-CREATE INDEX reservations_schedule_id ON reservations(schedule_id);
