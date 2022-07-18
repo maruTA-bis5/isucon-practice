@@ -5,12 +5,13 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"math/rand"
 	"os"
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
-	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
+	"github.com/oklog/ulid/v2"
 	"github.com/uptrace/opentelemetry-go-extra/otelsqlx"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -20,7 +21,7 @@ var (
 )
 
 var (
-// entropy = ulid.Monotonic(rand.New(rand.NewSource(time.Now().UnixNano())), 0)
+	entropy = ulid.Monotonic(rand.New(rand.NewSource(time.Now().UnixNano())), 0)
 )
 
 func Getenv(key string, defaultValue string) string {
@@ -70,21 +71,19 @@ func generateID(ctx context.Context, tx *sqlx.Tx, table string) string {
 	ctx, span = tracer.Start(ctx, "generateID")
 	defer span.End()
 
-	id, _ := uuid.NewRandom()
-	return id.String()
-	// id := ulid.MustNew(ulid.Timestamp(time.Now()), entropy).String()
-	// for {
-	// 	found := 0
-	// 	if err := tx.QueryRowContext(ctx, fmt.Sprintf("SELECT 1 FROM `%s` WHERE `id` = ? LIMIT 1", table), id).Scan(&found); err != nil {
-	// 		if err == sql.ErrNoRows {
-	// 			break
-	// 		}
-	// 		continue
-	// 	}
-	// 	if found == 0 {
-	// 		break
-	// 	}
-	// 	id = ulid.MustNew(ulid.Timestamp(time.Now()), entropy).String()
-	// }
-	// return id
+	id := ulid.MustNew(ulid.Timestamp(time.Now()), entropy).String()
+	for {
+		found := 0
+		if err := tx.QueryRowContext(ctx, fmt.Sprintf("SELECT 1 FROM `%s` WHERE `id` = ? LIMIT 1", table), id).Scan(&found); err != nil {
+			if err == sql.ErrNoRows {
+				break
+			}
+			continue
+		}
+		if found == 0 {
+			break
+		}
+		id = ulid.MustNew(ulid.Timestamp(time.Now()), entropy).String()
+	}
+	return id
 }
