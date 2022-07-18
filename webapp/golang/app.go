@@ -480,7 +480,7 @@ func findReservationCountByScheduleIDs(ctx context.Context, scheduleIDs []string
 	defer span.End()
 
 	var counts []*ReservationCount
-	query := "SELECT `schedule_id`, COUNT(1) AS count FROM `reservations` WHERE `schedule_id` IN (?)"
+	query := "SELECT `schedule_id`, COUNT(1) AS count FROM `reservations` WHERE `schedule_id` IN (?) GROUP BY `schedule_id`"
 	sql, params, err := sqlx.In(query, scheduleIDs)
 	if err != nil {
 		return nil, err
