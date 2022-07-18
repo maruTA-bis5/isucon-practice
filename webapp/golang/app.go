@@ -171,13 +171,6 @@ func serveMux() http.Handler {
 	router.HandleFunc("/api/schedules", schedulesHandler).Methods("GET")
 	router.HandleFunc("/api/schedules/{id}", withCurrentUser(scheduleHandler)).Methods("GET")
 
-	// dir, err := filepath.Abs(filepath.Join(filepath.Dir(os.Args[0]), "..", "public"))
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-	// publicDir = dir
-	// fs = http.FileServer(http.Dir(publicDir))
-
 	router.PathPrefix("/").HandlerFunc(htmlHandler)
 
 	return logger(router)
