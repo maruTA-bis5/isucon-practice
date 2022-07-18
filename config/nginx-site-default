@@ -60,6 +60,12 @@ server {
   }
 
   # application
+  location /files {
+    internal;
+    alias /home/isucon/webapp/frontend/dist;
+    try_files $uri =404;
+  }
+
   location / {
     try_files $uri @webapp;
   }

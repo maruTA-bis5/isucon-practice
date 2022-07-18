@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"os"
@@ -524,23 +523,27 @@ func scheduleHandler(w http.ResponseWriter, r *http.Request) {
 
 func htmlHandler(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path
-	realpath := filepath.Join(publicDir, path)
 
-	if stat, err := os.Stat(realpath); !os.IsNotExist(err) && !stat.IsDir() {
-		fs.ServeHTTP(w, r)
-		return
-	} else {
-		realpath = filepath.Join(publicDir, "index.html")
-	}
-
-	file, err := os.Open(realpath)
-	if err != nil {
-		sendErrorJSON(w, err, 500)
-		return
-	}
-	defer file.Close()
-
-	w.Header().Set("Content-Type", "text/html; chartset=utf-8")
+	w.Header().Set("X-Accel-Redirect", "/files/"+path)
 	w.WriteHeader(200)
-	io.Copy(w, file)
+
+	// realpath := filepath.Join(publicDir, path)
+
+	// if stat, err := os.Stat(realpath); !os.IsNotExist(err) && !stat.IsDir() {
+	// 	fs.ServeHTTP(w, r)
+	// 	return
+	// } else {
+	// 	realpath = filepath.Join(publicDir, "index.html")
+	// }
+
+	// file, err := os.Open(realpath)
+	// if err != nil {
+	// 	sendErrorJSON(w, err, 500)
+	// 	return
+	// }
+	// defer file.Close()
+
+	// w.Header().Set("Content-Type", "text/html; chartset=utf-8")
+	// w.WriteHeader(200)
+	// io.Copy(w, file)
 }
