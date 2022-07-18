@@ -516,7 +516,7 @@ func scheduleHandler(w http.ResponseWriter, r *http.Request) {
 
 func htmlHandler(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path
-	if path == "" {
+	if path == "" || path == "/" {
 		path = "index.html"
 	}
 
