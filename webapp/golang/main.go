@@ -44,7 +44,7 @@ func main() {
 }
 
 func installTracerProvider(ctx context.Context) error {
-	client := otlptracegrpc.NewClient()
+	client := otlptracegrpc.NewClient(otlptracegrpc.WithInsecure())
 	exporter, err := otlptrace.New(ctx, client)
 	if err != nil {
 		return err
