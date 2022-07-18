@@ -50,6 +50,10 @@ type Reservation struct {
 }
 
 func getCurrentUser(r *http.Request) *User {
+	currentUser := r.Context().Value(currentUserKey)
+	if currentUser != nil {
+		return currentUser.(*User)
+	}
 	uidCookie, err := r.Cookie("user_id")
 	if err != nil || uidCookie == nil {
 		return nil
@@ -160,7 +164,7 @@ func serveMux() http.Handler {
 	router.HandleFunc("/api/signup", signupHandler).Methods("POST")
 	router.HandleFunc("/api/login", loginHandler).Methods("POST")
 	router.HandleFunc("/api/schedules", createScheduleHandler).Methods("POST")
-	router.HandleFunc("/api/reservations", createReservationHandler).Methods("POST")
+	router.HandleFunc("/api/reservations", withCurrentUser(createReservationHandler)).Methods("POST")
 	router.HandleFunc("/api/schedules", schedulesHandler).Methods("GET")
 	router.HandleFunc("/api/schedules/{id}", scheduleHandler).Methods("GET")
 
@@ -174,6 +178,27 @@ func serveMux() http.Handler {
 	router.PathPrefix("/").HandlerFunc(htmlHandler)
 
 	return logger(router)
+}
+
+type contextKey string
+
+const currentUserKey contextKey = "currentUser"
+
+func withCurrentUser(next func(http.ResponseWriter, *http.Request)) func(http.ResponseWriter, *http.Request) {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+		uidCookie, err := r.Cookie("user_id")
+		if err != nil || uidCookie == nil {
+			sendErrorJSON(w, err, 500)
+		}
+		row := db.QueryRowxContext(r.Context(), "SELECT * FROM `users` WHERE `id` = ? LIMIT 1", uidCookie.Value)
+		user := &User{}
+		if err := row.StructScan(user); err != nil {
+			sendErrorJSON(w, err, 500)
+		}
+		ctx := context.WithValue(r.Context(), currentUserKey, user)
+		next(w, r.WithContext(ctx))
+	})
 }
 
 func logger(handler http.Handler) http.Handler {
