@@ -33,7 +33,6 @@ type Schedule struct {
 	ID           string         `db:"id" json:"id"`
 	Title        string         `db:"title" json:"title"`
 	Capacity     int            `db:"capacity" json:"capacity"`
-	Left         int            `db:"capacity"`
 	Reserved     int            `db:"reserved" json:"reserved"`
 	Reservations []*Reservation `db:"reservations" json:"reservations"`
 	CreatedAt    time.Time      `db:"created_at" json:"created_at"`
@@ -108,7 +107,7 @@ func getReservations(ctx context.Context, r *http.Request, s *Schedule) error {
 
 	defer rows.Close()
 
-	// reserved := 0
+	reserved := 0
 	s.Reservations = []*Reservation{}
 	for rows.Next() {
 		reservation := &Reservation{}
@@ -118,25 +117,25 @@ func getReservations(ctx context.Context, r *http.Request, s *Schedule) error {
 		reservation.User = getUser(ctx, r, userByID, reservation.UserID)
 
 		s.Reservations = append(s.Reservations, reservation)
-		// reserved++
+		reserved++
 	}
-	s.Reserved = s.Capacity - s.Left
+	s.Reserved = reserved
 
 	return nil
 }
 
 func getReservationsCount(r *http.Request, s *Schedule) error {
 	var span trace.Span
-	_, span = tracer.Start(r.Context(), "getReservationsCount")
+	ctx, span := tracer.Start(r.Context(), "getReservationsCount")
 	defer span.End()
 
-	// var count int
-	// err := db.GetContext(ctx, &count, "SELECT COUNT(*) FROM `reservations` WHERE `schedule_id` = ?", s.ID)
-	// if err != nil {
-	// 	return err
-	// }
+	var count int
+	err := db.GetContext(ctx, &count, "SELECT COUNT(*) FROM `reservations` WHERE `schedule_id` = ?", s.ID)
+	if err != nil {
+		return err
+	}
 
-	s.Reserved = s.Capacity - s.Left
+	s.Reserved = count
 
 	return nil
 }
@@ -365,8 +364,8 @@ func createScheduleHandler(w http.ResponseWriter, r *http.Request) {
 
 		if _, err := tx.ExecContext(
 			ctx,
-			"INSERT INTO `schedules` (`id`, `title`, `capacity`, `left`, `created_at`) VALUES (?, ?, ?, ?, NOW(6))",
-			id, title, capacity, capacity,
+			"INSERT INTO `schedules` (`id`, `title`, `capacity`, `created_at`) VALUES (?, ?, ?, NOW(6))",
+			id, title, capacity,
 		); err != nil {
 			return err
 		}
@@ -408,7 +407,7 @@ func createReservationHandler(w http.ResponseWriter, r *http.Request) {
 		userID := getCurrentUser(ctx, r).ID
 
 		found := 0
-		tx.QueryRowContext(ctx, "SELECT 1 FROM `schedules` WHERE `id` = ? LIMIT 1", scheduleID).Scan(&found)
+		tx.QueryRowContext(ctx, "SELECT 1 FROM `schedules` WHERE `id` = ? LIMIT 1 FOR UPDATE", scheduleID).Scan(&found)
 		if found != 1 {
 			return sendErrorJSON(w, fmt.Errorf("schedule not found"), 403)
 		}
@@ -425,32 +424,21 @@ func createReservationHandler(w http.ResponseWriter, r *http.Request) {
 			return sendErrorJSON(w, fmt.Errorf("already taken"), 403)
 		}
 
-		// capacity := 0
-		// if err := tx.QueryRowContext(ctx, "SELECT `capacity` FROM `schedules` WHERE `id` = ? LIMIT 1", scheduleID).Scan(&capacity); err != nil {
-		// 	return sendErrorJSON(w, err, 500)
-		// }
-
-		// reserved := 0
-		// err := tx.GetContext(ctx, &reserved, "SELECT COUNT(*) FROM `reservations` WHERE `schedule_id` = ?", scheduleID)
-		// if err != nil && err != sql.ErrNoRows {
-		// 	return sendErrorJSON(w, err, 500)
-		// }
-
-		left := 0
-		if err := tx.QueryRowContext(ctx, "SELECT left FROM `schedules` WHERE `id` = ? LIMIT 1", scheduleID).Scan(&left); err != nil {
+		capacity := 0
+		if err := tx.QueryRowContext(ctx, "SELECT `capacity` FROM `schedules` WHERE `id` = ? LIMIT 1", scheduleID).Scan(&capacity); err != nil {
 			return sendErrorJSON(w, err, 500)
 		}
-		if left <= 0 {
+
+		reserved := 0
+		err := tx.GetContext(ctx, &reserved, "SELECT COUNT(*) FROM `reservations` WHERE `schedule_id` = ?", scheduleID)
+		if err != nil && err != sql.ErrNoRows {
+			return sendErrorJSON(w, err, 500)
+		}
+
+		if reserved >= capacity {
 			return sendErrorJSON(w, fmt.Errorf("capacity is already full"), 403)
 		}
 
-		if _, err := tx.ExecContext(
-			ctx,
-			"UPDATE `schedules` SET left = left - 1 WHERE `schedule_id` = ? AND left = ?",
-			scheduleID, left,
-		); err != nil {
-			return err
-		}
 		if _, err := tx.ExecContext(
 			ctx,
 			"INSERT INTO `reservations` (`id`, `schedule_id`, `user_id`, `created_at`) VALUES (?, ?, ?, NOW(6))",
