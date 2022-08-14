@@ -1308,9 +1308,6 @@ public class Application {
                         break;
                     }
                 }
-                if (pagedRanks.isEmpty()) {
-                    throw new RetrievePlayerException("ranking: no ranking found. pss.size(): %d, ranks.size(): %d, pagedRanks.size(): %d, tenant; %s".formatted(pss.size(), ranks.size(), pagedRanks.size(), tenant.toString()));
-                }
 
                 return new SuccessResult(true, new CompetitionRankingHandlerResult(new CompetitionDetail(comp.getId(), comp.getTitle(), this.isValidFinishedAt(comp.getFinishedAt())), pagedRanks));
             } catch (DataAccessException e) {
