@@ -18,4 +18,5 @@ mysql -u"$ISUCON_DB_USER" \
 
 # SQLiteのデータベースを初期化
 rm -f /home/isucon/webapp/tenant_db/*.db
+rm -f /home/isucon/webapp/tenant_db/*.lock
 cp -r /home/isucon/initial_data/*.db /home/isucon/webapp/tenant_db/
