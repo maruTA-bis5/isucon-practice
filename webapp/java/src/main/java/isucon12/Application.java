@@ -1292,9 +1292,9 @@ public class Application {
 
                 List<CompetitionRank> pagedRanks = new ArrayList<>();
                 for (int i = 0; i < ranks.size(); i++) {
-                    // if (i < rankAfter) {
-                    //     continue;
-                    // }
+                    if (i < rankAfter) {
+                        continue;
+                    }
                     CompetitionRank rank = ranks.get(i);
 
                     CompetitionRank competitionRank = new CompetitionRank();
