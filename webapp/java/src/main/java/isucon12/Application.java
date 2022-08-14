@@ -1383,10 +1383,11 @@ public class Application {
     private List<PlayerScoreRow> selectLatestPlayerScores(Connection tenantDb) {
         var query = """
         SELECT tenant_id, player_id, competition_id, score, row_num, created_at, updated_at
-        FROM player_score
+        FROM player_score ps
         WHERE (tenant_id, player_id, competition_id, row_num) = (
-            SELECT DISTINCT tenant_id, player_id, competition_id, MAX(row_num) OVER(PARTITION BY player_id)
-            FROM player_score
+            SELECT tenant_id, player_id, competition_id, MAX(row_num) OVER(PARTITION BY player_id)
+            FROM player_score pps
+            WHERE (ps.tenant_id, ps.player_id, ps.competition_id) = (pps.tenant_id, pps.player_id, pps.competition_id)
         )
                 """;
         try (ResultSet rs = tenantDb.createStatement().executeQuery(query)) {
