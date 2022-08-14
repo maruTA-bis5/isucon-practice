@@ -108,8 +108,8 @@ regexp = '^GET /api/player/competition/[0-9a-zA-Z\-]+/ranking'
 name = 'GET /api/player/competition/:competition_id/ranking'
 
 [[bundle]]
-regexp = '^GET /api/player/competition/[0-9a-zA-Z\-]+/ranking'
-name = 'GET /api/player/competition/:competition_id/ranking'
+regexp = '^GET /api/player/competition/[0-9a-zA-Z\-]+/score'
+name = 'GET /api/player/competition/:competition_id/score'
 
 ################################################################################
 # Replace
