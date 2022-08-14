@@ -921,8 +921,8 @@ public class Application {
                             .addValue("competition_id", psr.getCompetitionId())
                             .addValue("score", psr.getScore())
                             .addValue("rownum", psr.getRowNum())
-                            .addValue("created_at", new java.sql.Date(psr.getCreatedAt().getTime()))
-                            .addValue("updated_at", new java.sql.Date(psr.getUpdatedAt().getTime()));
+                            .addValue("created_at", psr.getCreatedAt().getTime())
+                            .addValue("updated_at", psr.getUpdatedAt().getTime());
                         adminDb.update(
                             """
                                 INSERT INTO latest_player_score (tenant_id, player_id, competition_id, score, row_num, created_at, updated_at)
@@ -1362,8 +1362,8 @@ public class Application {
                             .addValue("competition_id", psr.getCompetitionId())
                             .addValue("score", psr.getScore())
                             .addValue("rownum", psr.getRowNum())
-                            .addValue("created_at", new java.sql.Date(psr.getCreatedAt().getTime()))
-                            .addValue("updated_at", new java.sql.Date(psr.getUpdatedAt().getTime()))
+                            .addValue("created_at", psr.getCreatedAt().getTime())
+                            .addValue("updated_at", psr.getUpdatedAt().getTime())
                 )
                 .toList();
                 adminDb.batchUpdate(
