@@ -387,7 +387,7 @@ public class Application {
         private PlayerRow retrievePlayer(Connection tenantDb, String id) throws RetrievePlayerException {
             var query = "SELECT * FROM player WHERE id = ";
             var source = new MapSqlParameterSource("id", id);
-            var player = adminDb.queryForObject(
+            var player = adminDb.query(
                 query + ":id", 
                 source,
                 (rs, index) -> 
@@ -399,8 +399,8 @@ public class Application {
                         new Date(rs.getLong("created_at")),
                         new Date(rs.getLong("updated_at")))
             );
-            if (player != null) {
-                return player;
+            if (!player.isEmpty()) {
+                return player.get(0);
             }
             // fallback
             try {
