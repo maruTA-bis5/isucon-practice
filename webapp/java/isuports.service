@@ -10,5 +10,6 @@ Type=simple
 User=isucon
 Group=isucon
 WorkingDirectory=/home/isucon/webapp/java
+EnvironmentFile=/home/isucon/webapp/env
 ExecStart=/home/isucon/webapp/java/gradlew bootRun
 Restart=always
