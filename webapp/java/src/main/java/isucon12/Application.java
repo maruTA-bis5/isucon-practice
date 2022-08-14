@@ -585,7 +585,7 @@ public class Application {
                     "INSERT INTO competition_billing (tenant_id, competition_id, title, player_count, visitor_count) VALUES (:tenant_id, :competition_id, :title, :player_count, :visitor_count)",
                     new MapSqlParameterSource()
                         .addValue("tenant_id", comp.getTenantId())
-                        .addValue("compettion_id", comp.getId())
+                        .addValue("competition_id", comp.getId())
                         .addValue("title", comp.getTitle())
                         .addValue("player_count", playerCount)
                         .addValue("visitor_count", visitorCount)
@@ -637,7 +637,7 @@ public class Application {
                     "INSERT INTO competition_billing (tenant_id, competition_id, title, player_count, visitor_count) VALUES (:tenant_id, :competition_id, :title, :player_count, :visitor_count)",
                     new MapSqlParameterSource()
                         .addValue("tenant_id", comp.getTenantId())
-                        .addValue("compettion_id", comp.getId())
+                        .addValue("competition_id", comp.getId())
                         .addValue("title", comp.getTitle())
                         .addValue("player_count", playerCount)
                         .addValue("visitor_count", visitorCount)
