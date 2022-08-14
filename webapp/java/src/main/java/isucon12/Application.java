@@ -499,6 +499,24 @@ public class Application {
         SqlParameterSource source = new MapSqlParameterSource()
                 .addValue("tenant_id", tenantId)
                 .addValue("competition_id", comp.getId());
+        List<BillingReport> report = adminDb.query(
+            "SELECT * FROM competition_billing WHERE tenant_id = :tenant_id AND competition_id = :competition_id",
+            source,
+            (rs, index) -> {
+                var billingReport = new BillingReport();
+                billingReport.setCompetitionId(rs.getString("competition_id"));
+                billingReport.setCompetitionTitle(rs.getString("title"));
+                billingReport.setPlayerCount(rs.getLong("player_count"));
+                billingReport.setVisitorCount(rs.getLong("visitor_count"));
+                billingReport.setBillingPlayerYen(rs.getLong("billing_player_yen")); // スコアを登録した参加者は100円
+                billingReport.setBillingVisitorYen(rs.getLong("billing_visitor_yen")); // ランキングを閲覧だけした(スコアを登録していない)参加者は10円
+                billingReport.setBillingYen(rs.getLong("billing_yen"));
+                return billingReport;
+            }
+        );
+        if (!report.isEmpty()) {
+            return report.get(0);
+        }
         RowMapper<VisitHistorySummaryRow> mapper = (rs, i) -> {
             VisitHistorySummaryRow row = new VisitHistorySummaryRow();
             row.setPlayerId(rs.getString("player_id"));
@@ -563,6 +581,15 @@ public class Application {
                 br.setBillingPlayerYen(100 * playerCount); // スコアを登録した参加者は100円
                 br.setBillingVisitorYen(10 * visitorCount); // ランキングを閲覧だけした(スコアを登録していない)参加者は10円
                 br.setBillingYen(100 * playerCount + 10 * visitorCount);
+                adminDb.update(
+                    "INSERT INTO competition_billing (tenant_id, competition_id, title, player_count, visitor_count) VALUES (:tenant_id, :competition_id, :title, :player_count, :visitor_count)",
+                    new MapSqlParameterSource()
+                        .addValue("tenant_id", comp.getTenantId())
+                        .addValue("compettion_id", comp.getId())
+                        .addValue("title", comp.getTitle())
+                        .addValue("player_count", playerCount)
+                        .addValue("visitor_count", visitorCount)
+                );
                 return br;
             } catch (SQLException | DataAccessException e) {
                 throw new BillingReportByCompetitionException(String.format("error Select count player_score: tenantID=%d, competitionID=%s, ", tenantId, competitionId), e);
@@ -606,6 +633,15 @@ public class Application {
                 br.setBillingPlayerYen(100 * playerCount); // スコアを登録した参加者は100円
                 br.setBillingVisitorYen(10 * visitorCount); // ランキングを閲覧だけした(スコアを登録していない)参加者は10円
                 br.setBillingYen(100 * playerCount + 10 * visitorCount);
+                adminDb.update(
+                    "INSERT INTO competition_billing (tenant_id, competition_id, title, player_count, visitor_count) VALUES (:tenant_id, :competition_id, :title, :player_count, :visitor_count)",
+                    new MapSqlParameterSource()
+                        .addValue("tenant_id", comp.getTenantId())
+                        .addValue("compettion_id", comp.getId())
+                        .addValue("title", comp.getTitle())
+                        .addValue("player_count", playerCount)
+                        .addValue("visitor_count", visitorCount)
+                );
                 return br;
             } catch (DataAccessException e) {
                 throw new BillingReportByCompetitionException(String.format("error Select count player_score: tenantID=%d, competitionID=%s, ", tenantId, competitionId), e);

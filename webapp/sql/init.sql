@@ -45,3 +45,16 @@ FROM player_score;
 
 DROP INDEX IF EXISTS `visit_history_idx`;
 CREATE INDEX IF NOT EXISTS `visit_history_ids` ON `visit_history` (`tenant_id`, `competition_id`, `player_id`, `created_at`);
+
+DROP TABLE IF EXISTS `competition_billing`;
+CREATE TABLE `competition_billing` (
+    tenant_id BIGINT NOT NULL,
+    competition_id VARCHAR(255) NOT NULL,
+    title TEXT NOT NULL,
+    player_count BIGINT NOT NULL,
+    visitor_count BIGINT NOT NULL,
+    billing_player_yen BIGINT GENERATED ALWAYS AS 100 * player_count STORED,
+    billing_visitor_yen BIGINT GENERATED ALWAYS AS 10 * visitor_count STORED,
+    billing_yen BIGINT GENERATED ALWAYS AS billing_player_yen + billing_visitor_yen STORED,
+    PRIMARY KEY (tenant_id, competition_id)
+) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4;
