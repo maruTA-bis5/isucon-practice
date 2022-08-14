@@ -28,6 +28,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -188,34 +189,7 @@ public class Application {
 
     // システム全体で一意なIDを生成する
     public String dispenseID() throws DispenseIdException {
-        String lastErrorString = "";
-        GeneratedKeyHolder holder = new GeneratedKeyHolder();
-        SqlParameterSource source = new MapSqlParameterSource().addValue("stub", "a");
-
-        for (int i = 0; i < 100; i++) {
-            try {
-                this.adminDb.update("REPLACE INTO id_generator (stub) VALUES (:stub);", source, holder);
-            } catch (DataAccessException e) {
-                if (e.getRootCause() instanceof SQLException) {
-                    SQLException se = (SQLException) e.getRootCause();
-                    // deadlock
-                    if (se.getErrorCode() == 1213) {
-                        lastErrorString = String.format("error REPLACE INTO id_generator: %s", se.getMessage());
-                        continue;
-                    }
-                }
-                throw new DispenseIdException(String.format("error REPLACE INTO id_generator: %s", e.getMessage()));
-            }
-            if (holder.getKey() == null) {
-                throw new DispenseIdException("error get last insert id");
-            }
-            break;
-        }
-
-        if (holder.getKey().longValue() != 0) {
-            return String.valueOf(holder.getKey().longValue());
-        }
-        throw new DispenseIdException(lastErrorString);
+        return UUID.randomUUID().toString();
     }
 
     public static void main(String[] args) {
