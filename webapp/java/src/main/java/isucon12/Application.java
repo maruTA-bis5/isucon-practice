@@ -448,6 +448,22 @@ public class Application {
                 .addValue("id", playerId);
             adminDb.update(query, source);
         }
+
+        public Map<String, PlayerRow> findByIds(Set<String> playerIds) {
+            List<PlayerRow> players = adminDb.query(
+                "SELECT * FROM player WHERE id IN (:ids)",
+                new MapSqlParameterSource("ids", playerIds),
+                (rs, idx) -> new PlayerRow(
+                    rs.getLong("tenant_id"),
+                    rs.getString("id"),
+                    rs.getString("display_name"),
+                    rs.getBoolean("is_disqualified"),
+                    null, // 使わないからnull new java.sql.Date(rs.getLong("created_at")),
+                    null // 使わないからnull new java.sql.Date(rs.getLong("updated_at")),
+                )
+            );
+            return players.stream().collect(Collectors.toMap(PlayerRow::getId, p -> p));
+        }
     }
 
     // 参加者を認可する
@@ -1284,10 +1300,12 @@ public class Application {
                                 new Date(rs.getLong("updated_at"))));
                 }
 
+                Set<String> playerIds = pss.stream().map(PlayerScoreRow::getPlayerId).collect(Collectors.toSet());
+                Map<String, PlayerRow> players = playerStore.findByIds(playerIds);
                 List<CompetitionRank> ranks = new ArrayList<>();
                 {
                     for (PlayerScoreRow ps : pss) {
-                        PlayerRow p = playerStore.retrievePlayer(ps.getPlayerId());
+                        PlayerRow p = players.get(ps.getPlayerId());
                         CompetitionRank competitionRank = new CompetitionRank();
                         competitionRank.setScore(ps.getScore());
                         competitionRank.setPlayerId(p.getId());
@@ -1332,8 +1350,6 @@ public class Application {
                 throw new WebException(HttpStatus.INTERNAL_SERVER_ERROR, "error admindb SQL: ", e);
             } catch (SQLException e) {
                 throw new WebException(HttpStatus.INTERNAL_SERVER_ERROR, "error tenantdb SQL: ", e);
-            } catch (RetrievePlayerException e) {
-                throw new WebException(HttpStatus.INTERNAL_SERVER_ERROR, "error retrievePlayer: ", e);
             } catch (AuthorizePlayerException e) {
                 throw new WebException(e.getHttpStatus(), e);
             } catch (RetrieveCompetitionException e) {
