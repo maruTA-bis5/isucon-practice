@@ -1352,27 +1352,9 @@ public class Application {
             res.setAppeal("");
 
             List<Long> tenantIds = adminDb.query("SELECT id FROM tenant", (rs, index) -> rs.getLong("id"));
-            List<? extends SqlParameterSource> latestScores = tenantIds.parallelStream()
+            tenantIds.parallelStream()
                 .map(this::connectToTenantDBUnchecked)
-                .map(this::selectLatestPlayerScores)
-                .flatMap(List::stream)
-                .map(psr -> new MapSqlParameterSource()
-                            .addValue("tenant_id", psr.getTenantId())
-                            .addValue("player_id", psr.getPlayerId())
-                            .addValue("competition_id", psr.getCompetitionId())
-                            .addValue("score", psr.getScore())
-                            .addValue("rownum", psr.getRowNum())
-                            .addValue("created_at", psr.getCreatedAt().getTime())
-                            .addValue("updated_at", psr.getUpdatedAt().getTime())
-                )
-                .toList();
-                adminDb.batchUpdate(
-                    """
-                        INSERT INTO latest_player_score (tenant_id, player_id, competition_id, score, row_num, created_at, updated_at)
-                        VALUES (:tenant_id, :player_id, :competition_id, :score, :rownum, :created_at, :updated_at)
-                    """,
-                    latestScores.toArray(SqlParameterSource[]::new)
-                );
+                .forEach(this::selectLatestPlayerScores);
         
             return new SuccessResult(true, res);
         } catch (IOException | InterruptedException e) {
@@ -1380,7 +1362,7 @@ public class Application {
         }
     }
 
-    private List<PlayerScoreRow> selectLatestPlayerScores(Connection tenantDb) {
+    private void selectLatestPlayerScores(Connection tenantDb) {
         var query = """
         SELECT tenant_id, player_id, competition_id, score, row_num, created_at, updated_at
         FROM player_score ps
@@ -1392,6 +1374,7 @@ public class Application {
                 """;
         try (ResultSet rs = tenantDb.createStatement().executeQuery(query)) {
             List<PlayerScoreRow> rows = new ArrayList<>();
+            int i = 0;
             while(rs.next()) {
                 var row = new PlayerScoreRow(
                     rs.getLong("tenant_id"),
@@ -1403,10 +1386,39 @@ public class Application {
                     new Date(rs.getLong("created_at")),
                     new Date(rs.getLong("updated_at")));
                 rows.add(row);
+                i++;
+                if (i > 100) {
+                    batchInsertLatestPlayerScores(rows);
+                    rows.clear();
+                    i = 0;
+                }
             }
-            return rows;
+            if (!rows.isEmpty()) {
+                batchInsertLatestPlayerScores(rows);
+            }
         } catch (SQLException e) {
             throw new IllegalStateException("Could not retrieve latest scores from tenantDb", e);
         }
+    }
+
+    private void batchInsertLatestPlayerScores(List<PlayerScoreRow> rows) {
+        List<? extends SqlParameterSource> scoreSources = rows.stream()
+            .map(psr -> new MapSqlParameterSource()
+                .addValue("tenant_id", psr.getTenantId())
+                .addValue("player_id", psr.getPlayerId())
+                .addValue("competition_id", psr.getCompetitionId())
+                .addValue("score", psr.getScore())
+                .addValue("rownum", psr.getRowNum())
+                .addValue("created_at", psr.getCreatedAt().getTime())
+                .addValue("updated_at", psr.getUpdatedAt().getTime())
+        )
+        .toList();
+        adminDb.batchUpdate(
+            """
+                INSERT INTO latest_player_score (tenant_id, player_id, competition_id, score, row_num, created_at, updated_at)
+                VALUES (:tenant_id, :player_id, :competition_id, :score, :rownum, :created_at, :updated_at)
+            """,
+            scoreSources.toArray(SqlParameterSource[]::new)
+        );
     }
 }
