@@ -546,8 +546,8 @@ public class Application {
         synchronized (this) {
             try (var ps = tenantDb.prepareStatement("SELECT DISTINCT(player_id) AS player_id FROM player_score WHERE tenant_id = ? AND competition_id = ?")) {
                 // スコアを登録した参加者のIDを取得する
-                ps.setLong(0, tenantId);
-                ps.setString(1, competitionId);
+                ps.setLong(1, tenantId);
+                ps.setString(2, competitionId);
                 var rs = ps.executeQuery();
                 Set<String> scoredPlayerIDs = new HashSet<>();
                 while(rs.next()) {
