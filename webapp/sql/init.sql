@@ -50,8 +50,8 @@ CREATE TABLE `competition_billing` (
     title TEXT NOT NULL,
     player_count BIGINT NOT NULL,
     visitor_count BIGINT NOT NULL,
-    billing_player_yen BIGINT GENERATED ALWAYS AS 100 * player_count STORED,
-    billing_visitor_yen BIGINT GENERATED ALWAYS AS 10 * visitor_count STORED,
-    billing_yen BIGINT GENERATED ALWAYS AS billing_player_yen + billing_visitor_yen STORED,
+    billing_player_yen BIGINT GENERATED ALWAYS AS (100 * player_count) STORED,
+    billing_visitor_yen BIGINT GENERATED ALWAYS AS (10 * visitor_count) STORED,
+    billing_yen BIGINT GENERATED ALWAYS AS (billing_player_yen + billing_visitor_yen) STORED,
     PRIMARY KEY (tenant_id, competition_id)
 ) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4;
