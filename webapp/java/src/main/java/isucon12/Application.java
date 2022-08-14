@@ -1351,10 +1351,10 @@ public class Application {
             // 競技中の最後に計測したものを参照して、講評記事などで使わせていただきます
             res.setAppeal("");
 
-            List<Long> tenantIds = adminDb.query("SELECT id FROM tenant", (rs, index) -> rs.getLong("id"));
-            tenantIds.parallelStream()
-                .map(this::connectToTenantDBUnchecked)
-                .forEach(this::selectLatestPlayerScores);
+            // List<Long> tenantIds = adminDb.query("SELECT id FROM tenant", (rs, index) -> rs.getLong("id"));
+            // tenantIds.parallelStream()
+            //     .map(this::connectToTenantDBUnchecked)
+            //     .forEach(this::selectLatestPlayerScores);
         
             return new SuccessResult(true, res);
         } catch (IOException | InterruptedException e) {
