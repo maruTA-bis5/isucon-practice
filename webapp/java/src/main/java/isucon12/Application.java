@@ -28,6 +28,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.StringJoiner;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -48,6 +49,7 @@ import org.springframework.dao.DataAccessException;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.RowMapper;
+import org.springframework.jdbc.core.namedparam.EmptySqlParameterSource;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.jdbc.core.namedparam.SqlParameterSource;
@@ -956,26 +958,7 @@ public class Application {
                     );
                 }
 
-                {
-                    // TODO bulk insert
-                    for (PlayerScoreRow psr : playerScoreRows) {
-                        var source = new MapSqlParameterSource()
-                            .addValue("tenant_id", psr.getTenantId())
-                            .addValue("player_id", psr.getPlayerId())
-                            .addValue("competition_id", psr.getCompetitionId())
-                            .addValue("score", psr.getScore())
-                            .addValue("rownum", psr.getRowNum())
-                            .addValue("created_at", psr.getCreatedAt().getTime())
-                            .addValue("updated_at", psr.getUpdatedAt().getTime());
-                        adminDb.update(
-                            """
-                                INSERT INTO latest_player_score (tenant_id, player_id, competition_id, score, row_num, created_at, updated_at)
-                                VALUES (:tenant_id, :player_id, :competition_id, :score, :rownum, :created_at, :updated_at)
-                            """,
-                            source
-                        );
-                    }
-                }
+                batchInsertLatestPlayerScores(playerScoreRows);
 
                 return new SuccessResult(true, new ScoreHandlerResult((long) playerScoreRows.size()));
             } catch (DatabaseException e) {
@@ -1445,24 +1428,27 @@ public class Application {
         }
     }
 
-    private void batchInsertLatestPlayerScores(List<PlayerScoreRow> rows) {
-        List<? extends SqlParameterSource> scoreSources = rows.stream()
-            .map(psr -> new MapSqlParameterSource()
-                .addValue("tenant_id", psr.getTenantId())
-                .addValue("player_id", psr.getPlayerId())
-                .addValue("competition_id", psr.getCompetitionId())
-                .addValue("score", psr.getScore())
-                .addValue("rownum", psr.getRowNum())
-                .addValue("created_at", psr.getCreatedAt().getTime())
-                .addValue("updated_at", psr.getUpdatedAt().getTime())
-        )
-        .toList();
-        adminDb.batchUpdate(
-            """
-                INSERT INTO latest_player_score (tenant_id, player_id, competition_id, score, row_num, created_at, updated_at)
-                VALUES (:tenant_id, :player_id, :competition_id, :score, :rownum, :created_at, :updated_at)
-            """,
-            scoreSources.toArray(SqlParameterSource[]::new)
+    private void batchInsertLatestPlayerScores(List<PlayerScoreRow> playerScoreRows) {
+        var values = new StringJoiner(",");
+        for (PlayerScoreRow psr : playerScoreRows) {
+            values.add(
+                """
+                    (%d, "%s", "%s", %d, %d, %d, %d)
+                """.formatted(
+                    psr.getTenantId(),
+                    psr.getPlayerId(),
+                    psr.getCompetitionId(),
+                    psr.getScore(),
+                    psr.getRowNum(),
+                    psr.getCreatedAt().getTime(),
+                    psr.getUpdatedAt().getTime()
+                )
+            );
+        }
+        adminDb.update(
+            "INSERT INTO latest_player_score (tenant_id, player_id, competition_id, score, row_num, created_at, updated_at) VALUES "
+                + values.toString(),
+            new EmptySqlParameterSource()
         );
     }
 }
