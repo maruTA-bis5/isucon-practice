@@ -543,7 +543,7 @@ public class Application {
 
         if (tenantId == 1) {
         // player_scoreを読んでいるときに更新が走ると不整合が起こるのでロックを取得する
-        synchronized (this) {
+        // synchronized (this) {
             try (var ps = tenantDb.prepareStatement("SELECT DISTINCT(player_id) AS player_id FROM player_score WHERE tenant_id = ? AND competition_id = ?")) {
                 ps.setQueryTimeout(SQLITE_BUSY_TIMEOUT);
                 // スコアを登録した参加者のIDを取得する
@@ -595,7 +595,7 @@ public class Application {
             } catch (SQLException | DataAccessException e) {
                 throw new BillingReportByCompetitionException(String.format("error Select count player_score: tenantID=%d, competitionID=%s, %s", tenantId, competitionId, e.toString()), e);
             }
-        }
+        // }
         } else {
             try {
                 // スコアを登録した参加者のIDを取得する
@@ -700,6 +700,7 @@ public class Application {
             tb.setDisplayName(t.getDisplayName());
 
             try (Connection tenantDb = this.connectToTenantDB(t.getId()); PreparedStatement ps = tenantDb.prepareStatement("SELECT * FROM competition WHERE tenant_id=?");) {
+                tenantDb.setAutoCommit(false);
                 ps.setQueryTimeout(SQLITE_BUSY_TIMEOUT);
                 ps.setLong(1, t.getId());
                 ResultSet rs = ps.executeQuery();
@@ -722,6 +723,7 @@ public class Application {
                     tb.setBillingYen(billingYen);
                 }
                 tenantBillings.add(tb);
+                tenantDb.commit();
             } catch (DatabaseException e) {
                 throw new WebException(HttpStatus.INTERNAL_SERVER_ERROR, "failed to connectToTenantDb: ", e);
             } catch (SQLException e) {
@@ -870,6 +872,7 @@ public class Application {
         }
 
         try (Connection tenantDb = this.connectToTenantDB(v.getTenantId()); PreparedStatement ps = tenantDb.prepareStatement("INSERT INTO competition (id, tenant_id, title, finished_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)");) {
+            tenantDb.setAutoCommit(false);
             java.sql.Date now = new java.sql.Date(new Date().getTime());
             String id = this.dispenseID();
 
@@ -881,6 +884,7 @@ public class Application {
             ps.setDate(5, now);
             ps.setDate(6, now);
             ps.executeUpdate();
+            tenantDb.commit();
 
             return new SuccessResult(true, new CompetitionsAddHandlerResult(new CompetitionDetail(id, title, false)));
         } catch (DatabaseException e) {
@@ -903,6 +907,7 @@ public class Application {
         }
 
         try (Connection tenantDb = this.connectToTenantDB(v.getTenantId());) {
+            tenantDb.setAutoCommit(false);
             CompetitionRow cr = this.retrieveCompetition(tenantDb, id);
             if (cr == null) {
                 // 存在しない大会
@@ -916,6 +921,7 @@ public class Application {
             ps.setDate(2, now);
             ps.setString(3, id);
             ps.executeUpdate();
+            tenantDb.commit();
             return new SuccessResult(true, null);
         } catch (DatabaseException e) {
             throw new WebException(HttpStatus.INTERNAL_SERVER_ERROR, "error connectToTenantDb: ", e);
@@ -937,9 +943,10 @@ public class Application {
         }
 
         // DELETEしたタイミングで参照が来ると空っぽのランキングになるのでロックする
-        var lockObj = v.getTenantId().longValue() == 1 ? this : new Object();
-        synchronized (lockObj) {
+        // var lockObj = v.getTenantId().longValue() == 1 ? this : new Object();
+        // synchronized (lockObj) {
             try (Connection tenantDb = this.connectToTenantDB(v.getTenantId());) {
+                tenantDb.setAutoCommit(false);
                 CompetitionRow comp = this.retrieveCompetition(tenantDb, competitionId);
                 if (comp == null) {
                     // 存在しない大会
@@ -1003,6 +1010,7 @@ public class Application {
 
                 batchInsertLatestPlayerScores(playerScoreRows);
 
+                tenantDb.commit();
                 return new SuccessResult(true, new ScoreHandlerResult((long) playerScoreRows.size()));
             } catch (DatabaseException e) {
                 throw new WebException(HttpStatus.INTERNAL_SERVER_ERROR, "error connectToTenantDb: ", e);
@@ -1019,7 +1027,7 @@ public class Application {
             } catch (DispenseIdException e) {
                 throw new WebException(HttpStatus.INTERNAL_SERVER_ERROR, "error dispenseID: ", e);
             }
-        }
+        // }
     }
 
     // テナント管理者向けAPI
@@ -1081,8 +1089,8 @@ public class Application {
         }
 
         // player_scoreを読んでいるときに更新が走ると不整合が起こるのでロックを取得する
-        var lockObj = v.getTenantId().longValue() == 1 ? this : new Object();
-        synchronized (lockObj) {
+        // var lockObj = v.getTenantId().longValue() == 1 ? this : new Object();
+        // synchronized (lockObj) {
 
             try (Connection tenantDb = this.connectToTenantDB(v.getTenantId());) {
                 this.authorizePlayer(tenantDb, v.getPlayerId());
@@ -1178,7 +1186,7 @@ public class Application {
             } catch (RetrieveCompetitionException e) {
                 throw new WebException(HttpStatus.INTERNAL_SERVER_ERROR, "error retrieveCompetition: ", e);
             }
-        }
+        // }
     }
 
     // 参加者向けAPI
@@ -1192,8 +1200,8 @@ public class Application {
         }
 
         // player_scoreを読んでいるときに更新が走ると不整合が起こるのでロックを取得する 
-        var lockObj = v.getTenantId().longValue() == 1 ? this : new Object();
-        synchronized (lockObj) {
+        // var lockObj = v.getTenantId().longValue() == 1 ? this : new Object();
+        // synchronized (lockObj) {
             try (Connection tenantDb = this.connectToTenantDB(v.getTenantId());) {
                 this.authorizePlayer(tenantDb, v.getPlayerId());
 
@@ -1325,7 +1333,7 @@ public class Application {
             } catch (RetrieveCompetitionException e) {
                 throw new WebException(HttpStatus.INTERNAL_SERVER_ERROR, "error retrieveCompetition: ", e);
             }
-        }
+        // }
     }
 
     // 参加者向けAPI
