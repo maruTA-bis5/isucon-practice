@@ -1,0 +1,14 @@
+[Unit]
+Description=isucon12 qualify webapp
+After=network.target
+
+[Install]
+WantedBy=multi-user.target
+
+[Service]
+Type=simple
+User=isucon
+Group=isucon
+WorkingDirectory=/home/isucon/webapp/java
+ExecStart=./gradlew bootRun
+Restart=always
