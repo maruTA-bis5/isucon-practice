@@ -1233,7 +1233,7 @@ public class Application {
 
                 List<PlayerScoreRow> pss = new ArrayList<>();
                 if (tenant.getId().longValue() == 1) {
-                    PreparedStatement ps = tenantDb.prepareStatement("SELECT * FROM player_score WHERE tenant_id = ? AND competition_id = ? ORDER BY row_num DESC, score DESC");
+                    PreparedStatement ps = tenantDb.prepareStatement("SELECT * FROM player_score WHERE tenant_id = ? AND competition_id = ? ORDER BY row_num DESC");
                     ps.setQueryTimeout(SQLITE_BUSY_TIMEOUT);
                     ps.setLong(1, tenant.getId());
                     ps.setString(2, competitionId);
@@ -1254,7 +1254,7 @@ public class Application {
                         .addValue("tenant_id", tenant.getId())
                         .addValue("competition_id", competitionId);
                     pss = adminDb.query(
-                        "SELECT * FROM latest_player_score WHERE tenant_id = :tenant_id AND competition_id = :competition_id ORDER BY score DESC",
+                        "SELECT * FROM latest_player_score WHERE tenant_id = :tenant_id AND competition_id = :competition_id",
                         source,
                         (rs,ignore) -> 
                             new PlayerScoreRow(
@@ -1281,6 +1281,16 @@ public class Application {
                         ranks.add(competitionRank);
                     }
                 }
+
+                Collections.sort(ranks, new Comparator<CompetitionRank>() {
+                    @Override
+                    public int compare(CompetitionRank o1, CompetitionRank o2) {
+                        if (o1.getScore().longValue() == o2.getScore().longValue()) {
+                            return Long.compare(o1.getRowNum(), o2.getRowNum());
+                        }
+                        return Long.compare(o2.getScore(), o1.getScore());
+                    }
+                });
 
                 List<CompetitionRank> pagedRanks = new ArrayList<>();
                 for (int i = 0; i < ranks.size(); i++) {
