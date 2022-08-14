@@ -592,7 +592,7 @@ public class Application {
                 );
                 return br;
             } catch (SQLException | DataAccessException e) {
-                throw new BillingReportByCompetitionException(String.format("error Select count player_score: tenantID=%d, competitionID=%s, ", tenantId, competitionId), e);
+                throw new BillingReportByCompetitionException(String.format("error Select count player_score: tenantID=%d, competitionID=%s, %s", tenantId, competitionId, e.toString()), e);
             }
         }
         } else {
