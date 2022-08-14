@@ -1154,7 +1154,8 @@ public class Application {
         }
 
         // player_scoreを読んでいるときに更新が走ると不整合が起こるのでロックを取得する
-        synchronized (this) {
+        var lockObj = v.getTenantId().longValue() == 1 ? this : new Object();
+        synchronized (lockObj) {
             try (Connection tenantDb = this.connectToTenantDB(v.getTenantId());) {
                 this.authorizePlayer(tenantDb, v.getPlayerId());
 
