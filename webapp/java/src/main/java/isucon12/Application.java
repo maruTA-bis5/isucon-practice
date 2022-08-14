@@ -434,7 +434,7 @@ public class Application {
 
     // 参加者を認可する
     // 参加者向けAPIで呼ばれる
-    private void authorizePlayer(Connection tenantDb, String id) throws AuthorizePlayerException {
+    private void authorizePlayer(String id) throws AuthorizePlayerException {
         try {
             PlayerRow player = playerStore.retrievePlayer(id);
             if (player == null) {
@@ -450,26 +450,19 @@ public class Application {
     }
 
     // 大会を取得する
-    private CompetitionRow retrieveCompetition(Connection tenantDb, String id) throws RetrieveCompetitionException {
-        try {
-            PreparedStatement ps = tenantDb.prepareStatement("SELECT * FROM competition WHERE id = ?");
-            ps.setQueryTimeout(SQLITE_BUSY_TIMEOUT);
-            ps.setString(1, id);
-            ResultSet rs = ps.executeQuery();
-            if (!rs.isBeforeFirst()) {
-                return null;
-            }
-
-            return new CompetitionRow(
+    private CompetitionRow retrieveCompetition(String id) throws RetrieveCompetitionException {
+        List<CompetitionRow> found = adminDb.query("SELECT * FROM competition WHERE id = :id",
+            new MapSqlParameterSource("id", id),
+            (rs, idx) -> 
+                new CompetitionRow(
                     rs.getLong("tenant_id"),
                     rs.getString("id"),
                     rs.getString("title"),
                     new Date(rs.getLong("finished_at")),
                     new Date(rs.getLong("created_at")),
-                    new Date(rs.getLong("updated_at")));
-        } catch (SQLException e) {
-            throw new RetrieveCompetitionException(String.format("error Select competition: id=%s, ", id), e);
-        }
+                    new Date(rs.getLong("updated_at")))
+        );
+        return found.isEmpty() ? null : found.get(0);
     }
 
     @PostMapping("/api/admin/tenants/add")
@@ -536,7 +529,7 @@ public class Application {
     private BillingReport billingReportByCompetition(Connection tenantDb, long tenantId, String competitionId) throws BillingReportByCompetitionException {
         CompetitionRow comp;
         try {
-            comp = this.retrieveCompetition(tenantDb, competitionId);
+            comp = this.retrieveCompetition(competitionId);
         } catch (RetrieveCompetitionException e) {
             throw new BillingReportByCompetitionException("error retrieveCompetition: ", e);
         }
@@ -921,27 +914,22 @@ public class Application {
             throw new WebException(HttpStatus.FORBIDDEN, "role organizer required");
         }
 
-        try (Connection tenantDb = this.connectToTenantDB(v.getTenantId());) {
-            tenantDb.setAutoCommit(false);
-            CompetitionRow cr = this.retrieveCompetition(tenantDb, id);
+        try {
+            CompetitionRow cr = this.retrieveCompetition(id);
             if (cr == null) {
                 // 存在しない大会
                 throw new WebException(HttpStatus.NOT_FOUND, "competition not found ");
             }
 
             java.sql.Date now = new java.sql.Date(new Date().getTime());
-            PreparedStatement ps = tenantDb.prepareStatement("UPDATE competition SET finished_at = ?, updated_at = ? WHERE id = ?");
-            ps.setQueryTimeout(SQLITE_BUSY_TIMEOUT);
-            ps.setDate(1, now);
-            ps.setDate(2, now);
-            ps.setString(3, id);
-            ps.executeUpdate();
-            tenantDb.commit();
+            var params = new MapSqlParameterSource()
+                .addValue("finished_at", now)
+                .addValue("updated_at", now)
+                .addValue("id", id);
+            adminDb.update(
+                "UPDATE competition SET finished_at = :finished_at, updated_at = :updated_at WHERE id = :id",
+                params);
             return new SuccessResult(true, null);
-        } catch (DatabaseException e) {
-            throw new WebException(HttpStatus.INTERNAL_SERVER_ERROR, "error connectToTenantDb: ", e);
-        } catch (SQLException e) {
-            throw new WebException(HttpStatus.INTERNAL_SERVER_ERROR, "error Update competition: ", e);
         } catch (RetrieveCompetitionException e) {
             throw new WebException(HttpStatus.INTERNAL_SERVER_ERROR, "error retrieveCompetition: ", e);
         }
@@ -960,9 +948,8 @@ public class Application {
         // DELETEしたタイミングで参照が来ると空っぽのランキングになるのでロックする
         // var lockObj = v.getTenantId().longValue() == 1 ? this : new Object();
         // synchronized (lockObj) {
-            try (Connection tenantDb = this.connectToTenantDB(v.getTenantId());) {
-                tenantDb.setAutoCommit(false);
-                CompetitionRow comp = this.retrieveCompetition(tenantDb, competitionId);
+            try {
+                CompetitionRow comp = this.retrieveCompetition(competitionId);
                 if (comp == null) {
                     // 存在しない大会
                     throw new WebException(HttpStatus.NOT_FOUND, "competition not found ");
@@ -1025,12 +1012,7 @@ public class Application {
 
                 batchInsertLatestPlayerScores(playerScoreRows);
 
-                tenantDb.commit();
                 return new SuccessResult(true, new ScoreHandlerResult((long) playerScoreRows.size()));
-            } catch (DatabaseException e) {
-                throw new WebException(HttpStatus.INTERNAL_SERVER_ERROR, "error connectToTenantDb: ", e);
-            } catch (SQLException e) {
-                throw new WebException(HttpStatus.INTERNAL_SERVER_ERROR, "error tenantdb.player_score: ", e);
             } catch (RetrieveCompetitionException e) {
                 throw new WebException(HttpStatus.INTERNAL_SERVER_ERROR, "error retrieveCompetition: ", e);
             } catch (IOException e) {
@@ -1108,30 +1090,25 @@ public class Application {
         // synchronized (lockObj) {
 
             try (Connection tenantDb = this.connectToTenantDB(v.getTenantId());) {
-                this.authorizePlayer(tenantDb, v.getPlayerId());
+                this.authorizePlayer(v.getPlayerId());
 
                 PlayerRow p = playerStore.retrievePlayer(playerId);
                 if (p == null) {
                     throw new WebException(HttpStatus.NOT_FOUND, String.format("player not found: %s", playerId));
                 }
 
-                List<CompetitionRow> cs = new ArrayList<>();
-                {
-                    PreparedStatement ps = tenantDb.prepareStatement("SELECT * FROM competition WHERE tenant_id = ? ORDER BY created_at ASC");
-                    ps.setQueryTimeout(SQLITE_BUSY_TIMEOUT);
-                    ps.setLong(1, v.getTenantId());
-                    ResultSet resultSet = ps.executeQuery();
-
-                    while (resultSet.next()) {
-                        cs.add(new CompetitionRow(
-                                resultSet.getLong("tenant_id"),
-                                resultSet.getString("id"),
-                                resultSet.getString("title"),
-                                new Date(resultSet.getLong("finished_at")),
-                                new Date(resultSet.getLong("created_at")),
-                                new Date(resultSet.getLong("updated_at"))));
-                    }
-                }
+                List<CompetitionRow> cs = adminDb.query(
+                    "SELECT * FROM competition WHERE tenant_id = :tenant_id ORDER BY created_at ASC",
+                    new MapSqlParameterSource("tenant_id", v.getTenantId()),
+                    (rs, idx)  ->
+                        new CompetitionRow(
+                            rs.getLong("tenant_id"),
+                            rs.getString("id"),
+                            rs.getString("title"),
+                            new Date(rs.getLong("finished_at")),
+                            new Date(rs.getLong("created_at")),
+                            new Date(rs.getLong("updated_at")))
+                );
 
                 List<PlayerScoreRow> pss = new ArrayList<>();
                 if (v.getTenantId().longValue() == 1) {
@@ -1183,7 +1160,7 @@ public class Application {
 
                 List<PlayerScoreDetail> psds = new ArrayList<>();
                 for (PlayerScoreRow psr : pss) {
-                    CompetitionRow comp = this.retrieveCompetition(tenantDb, psr.getCompetitionId());
+                    CompetitionRow comp = this.retrieveCompetition(psr.getCompetitionId());
                     psds.add(new PlayerScoreDetail(comp.getTitle(), psr.getScore()));
                 }
 
@@ -1218,10 +1195,10 @@ public class Application {
         // var lockObj = v.getTenantId().longValue() == 1 ? this : new Object();
         // synchronized (lockObj) {
             try (Connection tenantDb = this.connectToTenantDB(v.getTenantId());) {
-                this.authorizePlayer(tenantDb, v.getPlayerId());
+                this.authorizePlayer(v.getPlayerId());
 
                 // 大会の存在確認
-                CompetitionRow comp = this.retrieveCompetition(tenantDb, competitionId);
+                CompetitionRow comp = this.retrieveCompetition(competitionId);
                 if (comp == null) {
                     throw new WebException(HttpStatus.NOT_FOUND, "competition not found ");
                 }
@@ -1361,11 +1338,9 @@ public class Application {
             throw new WebException(HttpStatus.FORBIDDEN, "role player required");
         }
 
-        try (Connection tenantDb = this.connectToTenantDB(v.getTenantId());) {
-            this.authorizePlayer(tenantDb, v.getPlayerId());
-            return this.competitionsHandler(v, tenantDb);
-        } catch (DatabaseException | SQLException e) {
-            throw new WebException(HttpStatus.INTERNAL_SERVER_ERROR, "error connectToTenantDb: ", e);
+        try {
+            this.authorizePlayer(v.getPlayerId());
+            return this.competitionsHandler(v);
         } catch (AuthorizePlayerException e) {
             throw new WebException(e.getHttpStatus(), e);
         }
@@ -1381,39 +1356,29 @@ public class Application {
             throw new WebException(HttpStatus.FORBIDDEN, "role organizer required");
         }
 
-        try (Connection tenantDb = this.connectToTenantDB(v.getTenantId());) {
-            return this.competitionsHandler(v, tenantDb);
-        } catch (DatabaseException | SQLException e) {
-            throw new WebException(HttpStatus.INTERNAL_SERVER_ERROR, "error connectToTenantDb: ", e);
-        }
+        return this.competitionsHandler(v);
     }
 
-    private SuccessResult competitionsHandler(Viewer v, Connection tenantDb) {
-        try {
-            PreparedStatement ps = tenantDb.prepareStatement("SELECT * FROM competition WHERE tenant_id=? ORDER BY created_at DESC");
-            ps.setQueryTimeout(SQLITE_BUSY_TIMEOUT);
-            ps.setLong(1, v.getTenantId());
-            ResultSet rs = ps.executeQuery();
+    private SuccessResult competitionsHandler(Viewer v) {
+        List<CompetitionRow> cs = adminDb.query(
+            "SELECT * FROM competition WHERE tenant_id=:tenant_id ORDER BY created_at DESC",
+            new MapSqlParameterSource("tenant_id", v.getTenantId()),
+            (rs, idx) ->
+                new CompetitionRow(
+                    rs.getLong("tenant_id"),
+                    rs.getString("id"),
+                    rs.getString("title"),
+                    new Date(rs.getLong("finished_at")),
+                    new Date(rs.getLong("created_at")),
+                    new Date(rs.getLong("updated_at"))
+                )
+        );
 
-            List<CompetitionRow> cs = new ArrayList<>();
-            while (rs.next()) {
-                cs.add(new CompetitionRow(
-                        rs.getLong("tenant_id"),
-                        rs.getString("id"),
-                        rs.getString("title"),
-                        new Date(rs.getLong("finished_at")),
-                        new Date(rs.getLong("created_at")),
-                        new Date(rs.getLong("updated_at"))));
-            }
-
-            List<CompetitionDetail> cds = new ArrayList<>();
-            for (CompetitionRow comp : cs) {
-                cds.add(new CompetitionDetail(comp.getId(), comp.getTitle(), this.isValidFinishedAt(comp.getFinishedAt())));
-            }
-            return new SuccessResult(true, new CompetitionsHandlerResult(cds));
-        } catch (SQLException e) {
-            throw new WebException(HttpStatus.INTERNAL_SERVER_ERROR, "error Select competition: ", e);
+        List<CompetitionDetail> cds = new ArrayList<>();
+        for (CompetitionRow comp : cs) {
+            cds.add(new CompetitionDetail(comp.getId(), comp.getTitle(), this.isValidFinishedAt(comp.getFinishedAt())));
         }
+        return new SuccessResult(true, new CompetitionsHandlerResult(cds));
     }
 
     // 全ロール及び未認証でも使えるhandler
