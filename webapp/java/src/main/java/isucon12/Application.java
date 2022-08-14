@@ -918,7 +918,7 @@ public class Application {
                 throw new WebException(HttpStatus.NOT_FOUND, "competition not found ");
             }
 
-            java.sql.Date now = new java.sql.Date(new Date().getTime());
+            var now = new Date().getTime() / 1000;
             var params = new MapSqlParameterSource()
                 .addValue("finished_at", now)
                 .addValue("updated_at", now)
