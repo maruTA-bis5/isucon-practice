@@ -584,6 +584,19 @@ public class Application {
             throw new BillingReportByCompetitionException(String.format("error not found competition id=%s : ", competitionId));
         }
 
+        boolean finished = this.isValidFinishedAt(comp.getFinishedAt());
+        if (!finished) {
+            BillingReport br = new BillingReport();
+            br.setCompetitionId(comp.getId());
+            br.setCompetitionTitle(comp.getTitle());
+            br.setPlayerCount(0L);
+            br.setVisitorCount(0L);
+            br.setBillingPlayerYen(0L);
+            br.setBillingVisitorYen(0L);
+            br.setBillingYen(0L);
+            return br;
+        }
+
         SqlParameterSource source = new MapSqlParameterSource()
                 .addValue("tenant_id", tenantId)
                 .addValue("competition_id", comp.getId());
@@ -650,16 +663,14 @@ public class Application {
 
                 // 大会が終了している場合のみ請求金額が確定するので計算する
                 long playerCount = 0, visitorCount = 0;
-                if (this.isValidFinishedAt(comp.getFinishedAt())) {
-                    for (Map.Entry<String, String> entry : billingMap.entrySet()) {
-                        switch (entry.getValue()) {
-                        case "player":
-                            playerCount++;
-                            break;
-                        case "visitor":
-                            visitorCount++;
-                            break;
-                        }
+                for (Map.Entry<String, String> entry : billingMap.entrySet()) {
+                    switch (entry.getValue()) {
+                    case "player":
+                        playerCount++;
+                        break;
+                    case "visitor":
+                        visitorCount++;
+                        break;
                     }
                 }
                 BillingReport br = new BillingReport();
@@ -702,16 +713,14 @@ public class Application {
 
                 // 大会が終了している場合のみ請求金額が確定するので計算する
                 long playerCount = 0, visitorCount = 0;
-                if (this.isValidFinishedAt(comp.getFinishedAt())) {
-                    for (Map.Entry<String, String> entry : billingMap.entrySet()) {
-                        switch (entry.getValue()) {
-                        case "player":
-                            playerCount++;
-                            break;
-                        case "visitor":
-                            visitorCount++;
-                            break;
-                        }
+                for (Map.Entry<String, String> entry : billingMap.entrySet()) {
+                    switch (entry.getValue()) {
+                    case "player":
+                        playerCount++;
+                        break;
+                    case "visitor":
+                        visitorCount++;
+                        break;
                     }
                 }
                 BillingReport br = new BillingReport();
