@@ -1182,14 +1182,14 @@ public class Application {
                 }
 
                 } else {
-                for (CompetitionRow c : cs) {
-                    // 最後にCSVに登場したスコアを採用する = row_numが一番大きいもの
+                Set<String> competitionIds = cs.stream().map(CompetitionRow::getId).collect(Collectors.toSet());
+                if (!competitionIds.isEmpty()) {
                     var source = new MapSqlParameterSource()
                         .addValue("tenant_id", v.getTenantId())
-                        .addValue("competition_id", c.getId())
+                        .addValue("competition_ids", competitionIds)
                         .addValue("player_id", p.getId());
                     pss.addAll(adminDb.query(
-                        "SELECT * FROM latest_player_score WHERE tenant_id = :tenant_id AND competition_id = :competition_id AND player_id = :player_id ",
+                        "SELECT * FROM latest_player_score WHERE tenant_id = :tenant_id AND competition_id IN (:competition_ids) AND player_id = :player_id ",
                         source,
                         (rs,ignore) -> new PlayerScoreRow(
                             rs.getLong("tenant_id"),
@@ -1202,10 +1202,10 @@ public class Application {
                             new Date(rs.getLong("updated_at")))));
                 }
                 }
-
+                Map<String, CompetitionRow> competitionById = cs.stream().collect(Collectors.toMap(CompetitionRow::getId, c->c));
                 List<PlayerScoreDetail> psds = new ArrayList<>();
                 for (PlayerScoreRow psr : pss) {
-                    CompetitionRow comp = this.retrieveCompetition(psr.getCompetitionId());
+                    CompetitionRow comp = competitionById.get(psr.getCompetitionId());
                     psds.add(new PlayerScoreDetail(comp.getTitle(), psr.getScore()));
                 }
 
@@ -1218,8 +1218,6 @@ public class Application {
                 throw new WebException(HttpStatus.INTERNAL_SERVER_ERROR, "error retrievePlayer: ", e);
             } catch (AuthorizePlayerException e) {
                 throw new WebException(e.getHttpStatus(), e);
-            } catch (RetrieveCompetitionException e) {
-                throw new WebException(HttpStatus.INTERNAL_SERVER_ERROR, "error retrieveCompetition: ", e);
             }
         // }
     }
