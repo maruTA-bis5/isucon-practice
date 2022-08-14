@@ -895,14 +895,14 @@ public class Application {
 
         try ( Connection tenantDb = this.connectToTenantDB(v.getTenantId())) {
             tenantDb.setAutoCommit(false);
-            playerStore.disqualified(tenantDb, playerId);
             PlayerRow p = playerStore.retrievePlayer(tenantDb, playerId);
             if (p == null) {
                 throw new WebException(HttpStatus.NOT_FOUND, "player not found");
             }
+            playerStore.disqualified(tenantDb, playerId);
 
             tenantDb.commit();
-            return new SuccessResult(true, new PlayerDisqualifiedHandlerResult(new PlayerDetail(p.getId(), p.getDisplayName(), p.getIsDisqualified())));
+            return new SuccessResult(true, new PlayerDisqualifiedHandlerResult(new PlayerDetail(p.getId(), p.getDisplayName(), true)));
         } catch (DatabaseException e) {
             throw new WebException(HttpStatus.INTERNAL_SERVER_ERROR, "error connectToTenantDb: ", e);
         } catch (SQLException e) {
