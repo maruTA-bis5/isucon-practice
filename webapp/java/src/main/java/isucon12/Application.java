@@ -35,6 +35,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import javax.annotation.PostConstruct;
 import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
 
@@ -153,6 +154,10 @@ public class Application {
     @Value("${ISUCON_ADMIN_HOSTNAME:admin.t.isucon.dev}")
     private String ISUCON_ADMIN_HOSTNAME;
 
+    @PostConstruct void onPostConstruct() {
+        jwtVerifier = JWT.require(Algorithm.RSA256(this.readPublicKeyFromFile(ISUCON_JWT_KEY_FILE), null)).build();
+    }
+
     public String tenantDBPath(long id) {
         return Paths.get(ISUCON_TENANT_DB_DIR).resolve(String.format("%d.db", id)).toString();
     }
@@ -247,7 +252,7 @@ public class Application {
 
         String token = cookie.getValue();
 
-        DecodedJWT decodedJwt = this.verifyJwt(token, ISUCON_JWT_KEY_FILE);
+        DecodedJWT decodedJwt = this.verifyJwt(token);
 
         if (StringUtils.isEmpty(decodedJwt.getSubject())) {
             throw new WebException(HttpStatus.UNAUTHORIZED, String.format("invalid token: subject is not found in token: %s", token));
@@ -309,9 +314,9 @@ public class Application {
         }
     }
 
-    private DecodedJWT verifyJwt(String token, String publicKeyFilePath) {
-        JWTVerifier jwtVerifier = JWT.require(Algorithm.RSA256(this.readPublicKeyFromFile(publicKeyFilePath), null)).build();
+    private JWTVerifier jwtVerifier;
 
+    private DecodedJWT verifyJwt(String token) {
         try {
             return jwtVerifier.verify(token);
         } catch (JWTVerificationException e) {
@@ -1038,7 +1043,8 @@ public class Application {
         }
 
         // player_scoreを読んでいるときに更新が走ると不整合が起こるのでロックを取得する
-        synchronized (this) {
+        var lockObj = v.getTenantId().longValue() == 1 ? this : new Object();
+        synchronized (lockObj) {
 
             try (Connection tenantDb = this.connectToTenantDB(v.getTenantId());) {
                 this.authorizePlayer(tenantDb, v.getPlayerId());
