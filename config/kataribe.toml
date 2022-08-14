@@ -99,6 +99,18 @@ duration_index = 10
 #regexp = '^(GET|HEAD) /images/'
 #name = 'GET /images/*'
 
+[[bundle]]
+regexp = '^GET /api/player/player/[0-9a-zA-Z\-]+'
+name = 'GET /api/player/player/:player_id'
+
+[[bundle]]
+regexp = '^GET /api/player/competition/[0-9a-zA-Z\-]+/ranking'
+name = 'GET /api/player/competition/:competition_id/ranking'
+
+[[bundle]]
+regexp = '^GET /api/player/competition/[0-9a-zA-Z\-]+/ranking'
+name = 'GET /api/player/competition/:competition_id/ranking'
+
 ################################################################################
 # Replace
 ################################################################################
