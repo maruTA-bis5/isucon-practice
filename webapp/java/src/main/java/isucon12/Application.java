@@ -671,7 +671,11 @@ public class Application {
                 br.setBillingVisitorYen(10 * visitorCount); // ランキングを閲覧だけした(スコアを登録していない)参加者は10円
                 br.setBillingYen(100 * playerCount + 10 * visitorCount);
                 adminDb.update(
-                    "INSERT INTO competition_billing (tenant_id, competition_id, title, player_count, visitor_count) VALUES (:tenant_id, :competition_id, :title, :player_count, :visitor_count)",
+                    """
+                        INSERT INTO competition_billing (tenant_id, competition_id, title, player_count, visitor_count)
+                        VALUES (:tenant_id, :competition_id, :title, :player_count, :visitor_count)
+                        ON DUPLICATE KEY UPDATE player_count = :player_count, visitor_count = :visitor_count
+                    """,
                     new MapSqlParameterSource()
                         .addValue("tenant_id", comp.getTenantId())
                         .addValue("competition_id", comp.getId())
@@ -721,7 +725,11 @@ public class Application {
                 br.setBillingVisitorYen(10 * visitorCount); // ランキングを閲覧だけした(スコアを登録していない)参加者は10円
                 br.setBillingYen(100 * playerCount + 10 * visitorCount);
                 adminDb.update(
-                    "INSERT INTO competition_billing (tenant_id, competition_id, title, player_count, visitor_count) VALUES (:tenant_id, :competition_id, :title, :player_count, :visitor_count)",
+                    """
+                        INSERT INTO competition_billing (tenant_id, competition_id, title, player_count, visitor_count)
+                        VALUES (:tenant_id, :competition_id, :title, :player_count, :visitor_count)
+                        ON DUPLICATE KEY UPDATE player_count = :player_count, visitor_count = :visitor_count
+                    """,
                     new MapSqlParameterSource()
                         .addValue("tenant_id", comp.getTenantId())
                         .addValue("competition_id", comp.getId())
