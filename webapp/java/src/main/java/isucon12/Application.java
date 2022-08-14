@@ -366,7 +366,7 @@ public class Application {
 
     class PlayerStore {
 
-        private String insertPlayer(Connection tenantDb, long tenantId, String displayName) throws DispenseIdException {
+        private String insertPlayer(long tenantId, String displayName) throws DispenseIdException {
             String id = dispenseID();
 
             var now = new Date().getTime() / 1000;
@@ -384,7 +384,7 @@ public class Application {
         }
 
         // 参加者を取得する
-        private PlayerRow retrievePlayer(Connection tenantDb, String id) throws RetrievePlayerException {
+        private PlayerRow retrievePlayer(String id) throws RetrievePlayerException {
             var query = "SELECT * FROM player WHERE id = ";
             var source = new MapSqlParameterSource("id", id);
             var player = adminDb.query(
@@ -401,31 +401,12 @@ public class Application {
             );
             if (!player.isEmpty()) {
                 return player.get(0);
-            }
-            // fallback
-            try {
-                PreparedStatement ps = tenantDb.prepareStatement(query + "?");
-                ps.setQueryTimeout(SQLITE_BUSY_TIMEOUT);
-                ps.setString(1, id);
-                ResultSet rs = ps.executeQuery();
-                if (!rs.isBeforeFirst()) {
-                    return null;
-                }
-                return new PlayerRow(
-                        rs.getLong("tenant_id"),
-                        rs.getString("id"),
-                        rs.getString("display_name"),
-                        rs.getBoolean("is_disqualified"),
-                        new Date(rs.getLong("created_at")),
-                        new Date(rs.getLong("updated_at")));
-            } catch (SQLException e) {
-                throw new RetrievePlayerException(String.format("error Select Player: id=%s, ", id) + e.toString(), e);
+            } else {
+                return null;
             }
         }
 
-        public List<PlayerRow> findPlayersByTenantIdOrderByCreatedAtDesc(Long tenantId) throws SQLException, DatabaseException {
-            // adminDbにも保存されている場合があるので、1つにまとめて返す
-            List<PlayerRow> pls = new ArrayList<>();
+        public List<PlayerRow> findPlayersByTenantIdOrderByCreatedAtDesc(Long tenantId) {
             RowMapper<PlayerRow> mapper = (rs, idx) -> 
                     new PlayerRow(
                         rs.getLong("tenant_id"),
@@ -434,41 +415,20 @@ public class Application {
                         rs.getBoolean("is_disqualified"),
                         new Date(rs.getLong("created_at")),
                         new Date(rs.getLong("updated_at")));
-            pls.addAll(adminDb.query(
+            return adminDb.query(
                 "SELECT * FROM player WHERE tenant_id = :tenant_id ORDER BY created_at DESC",
                 new MapSqlParameterSource("tenant_id", tenantId),
                 mapper
-            ));
-            try (var tenantDb = connectToTenantDB(tenantId);PreparedStatement ps = tenantDb.prepareStatement("SELECT * FROM player WHERE tenant_id=? ORDER BY created_at DESC")) {
-                ps.setQueryTimeout(SQLITE_BUSY_TIMEOUT);
-                ps.setLong(1, tenantId);
-                ResultSet rs = ps.executeQuery();
-
-                while (rs.next()) {
-                    pls.add(mapper.mapRow(rs, rs.getRow()));
-                }
-            }
-            pls.sort(Comparator.comparing(PlayerRow::getCreatedAt).reversed());
-            return pls;
+            );
         }
 
-        public void disqualified(Connection tenantDb, String playerId) throws SQLException {
+        public void disqualified(String playerId) throws SQLException {
             var query = "UPDATE player SET is_disqualified = true, updated_at = :updated_at WHERE id = :id";
             var now = new Date().getTime();
             var source = new MapSqlParameterSource()
                 .addValue("updated_at", now/1000)
                 .addValue("id", playerId);
-            if (adminDb.update(query, source) != 0) {
-                return;
-            }
-            // fallback
-            try (PreparedStatement ps = tenantDb.prepareStatement("UPDATE player SET is_disqualified = ?, updated_at = ? WHERE id = ?")) {
-                ps.setQueryTimeout(SQLITE_BUSY_TIMEOUT);
-                ps.setBoolean(1, true);
-                ps.setDate(2, new java.sql.Date(now));
-                ps.setString(3, playerId);
-                ps.executeUpdate();
-            }
+            adminDb.update(query, source);
         }
     }
 
@@ -476,7 +436,7 @@ public class Application {
     // 参加者向けAPIで呼ばれる
     private void authorizePlayer(Connection tenantDb, String id) throws AuthorizePlayerException {
         try {
-            PlayerRow player = playerStore.retrievePlayer(tenantDb, id);
+            PlayerRow player = playerStore.retrievePlayer(id);
             if (player == null) {
                 throw new AuthorizePlayerException(HttpStatus.UNAUTHORIZED, String.format("player not found: id=%s", id));
             }
@@ -846,7 +806,6 @@ public class Application {
             throw new WebException(HttpStatus.FORBIDDEN, "role organizer required");
         }
 
-        Connection tenantDb = null;
         try {
             List<PlayerRow> pls = playerStore.findPlayersByTenantIdOrderByCreatedAtDesc(v.getTenantId());
 
@@ -856,9 +815,7 @@ public class Application {
             }
 
             return new SuccessResult(true, new PlayersListHandlerResult(pds));
-        } catch (DatabaseException e) {
-            throw new WebException(HttpStatus.INTERNAL_SERVER_ERROR, "error connectToTenantDb: ", e);
-        } catch (SQLException e) {
+        } catch (DataAccessException e) {
             throw new WebException(HttpStatus.INTERNAL_SERVER_ERROR, "error Select player: " + e.toString(), e);
         }
     }
@@ -876,8 +833,8 @@ public class Application {
         List<PlayerDetail> pds = new ArrayList<>();
         try (Connection tenantDb = this.connectToTenantDB(v.getTenantId());) {
             for (String displayName : displayNames) {
-                String id = playerStore.insertPlayer(tenantDb, v.getTenantId(), displayName);
-                PlayerRow p = playerStore.retrievePlayer(tenantDb, id);
+                String id = playerStore.insertPlayer(v.getTenantId(), displayName);
+                PlayerRow p = playerStore.retrievePlayer(id);
                 pds.add(new PlayerDetail(p.getId(), p.getDisplayName(), p.getIsDisqualified()));
             }
             return new SuccessResult(true, new PlayersAddHandlerResult(pds));
@@ -903,14 +860,12 @@ public class Application {
         }
 
         try ( Connection tenantDb = this.connectToTenantDB(v.getTenantId())) {
-            tenantDb.setAutoCommit(false);
-            PlayerRow p = playerStore.retrievePlayer(tenantDb, playerId);
+            PlayerRow p = playerStore.retrievePlayer(playerId);
             if (p == null) {
                 throw new WebException(HttpStatus.NOT_FOUND, "player not found");
             }
-            playerStore.disqualified(tenantDb, playerId);
+            playerStore.disqualified(playerId);
 
-            tenantDb.commit();
             return new SuccessResult(true, new PlayerDisqualifiedHandlerResult(new PlayerDetail(p.getId(), p.getDisplayName(), true)));
         } catch (DatabaseException e) {
             throw new WebException(HttpStatus.INTERNAL_SERVER_ERROR, "error connectToTenantDb: ", e);
@@ -1044,7 +999,7 @@ public class Application {
                     String playerId = row.get(0);
                     String scoreStr = row.get(1);
 
-                    PlayerRow p = playerStore.retrievePlayer(tenantDb, playerId);
+                    PlayerRow p = playerStore.retrievePlayer(playerId);
                     // 存在しない参加者が含まれている
                     if (p == null) {
                         throw new WebException(HttpStatus.BAD_REQUEST, String.format("player not found: %s", playerId));
@@ -1155,7 +1110,7 @@ public class Application {
             try (Connection tenantDb = this.connectToTenantDB(v.getTenantId());) {
                 this.authorizePlayer(tenantDb, v.getPlayerId());
 
-                PlayerRow p = playerStore.retrievePlayer(tenantDb, playerId);
+                PlayerRow p = playerStore.retrievePlayer(playerId);
                 if (p == null) {
                     throw new WebException(HttpStatus.NOT_FOUND, String.format("player not found: %s", playerId));
                 }
@@ -1339,7 +1294,7 @@ public class Application {
                 List<CompetitionRank> ranks = new ArrayList<>();
                 {
                     for (PlayerScoreRow ps : pss) {
-                        PlayerRow p = playerStore.retrievePlayer(tenantDb, ps.getPlayerId());
+                        PlayerRow p = playerStore.retrievePlayer(ps.getPlayerId());
                         CompetitionRank competitionRank = new CompetitionRank();
                         competitionRank.setScore(ps.getScore());
                         competitionRank.setPlayerId(p.getId());
@@ -1490,15 +1445,13 @@ public class Application {
             return new SuccessResult(true, new MeHandlerResult(td, null, v.getRole(), true));
         }
 
-        try (Connection tenantDb = this.connectToTenantDB(v.getTenantId());) {
-            PlayerRow p = playerStore.retrievePlayer(tenantDb, v.getPlayerId());
+        try {
+            PlayerRow p = playerStore.retrievePlayer(v.getPlayerId());
             if (p == null) {
                 return new SuccessResult(true, new MeHandlerResult(td, null, ROLE_NONE, false));
             }
 
             return new SuccessResult(true, new MeHandlerResult(td, new PlayerDetail(p.getId(), p.getDisplayName(), p.getIsDisqualified()), v.getRole(), true));
-        } catch (DatabaseException | SQLException e) {
-            throw new WebException(HttpStatus.INTERNAL_SERVER_ERROR, "error connectToTenantDb: ", e);
         } catch (RetrievePlayerException e) {
             throw new WebException(HttpStatus.INTERNAL_SERVER_ERROR, "error retrievePlayer: ", e);
         }
