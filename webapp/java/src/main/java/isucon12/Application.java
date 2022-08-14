@@ -891,7 +891,7 @@ public class Application {
                     .addValue("id", id)
                     .addValue("tenant_id", v.getTenantId())
                     .addValue("title", title)
-                    .addValue("creted_at", now)
+                    .addValue("created_at", now)
                     .addValue("updated_at", now)
             );
 
