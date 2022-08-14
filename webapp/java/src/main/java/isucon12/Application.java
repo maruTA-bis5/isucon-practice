@@ -442,8 +442,8 @@ public class Application {
         SqlParameterSource source = new MapSqlParameterSource()
                 .addValue("name", name)
                 .addValue("display_name", displayName)
-                .addValue("created_at", now.getTime())
-                .addValue("updated_at", now.getTime());
+                .addValue("created_at", now.getTime()/1000)
+                .addValue("updated_at", now.getTime()/1000);
         GeneratedKeyHolder holder = new GeneratedKeyHolder();
         try {
             this.adminDb.update("INSERT INTO tenant (name, display_name, created_at, updated_at) VALUES (:name, :display_name, :created_at, :updated_at)", source, holder);
@@ -1223,8 +1223,8 @@ public class Application {
                             .addValue("player_id", v.getPlayerId())
                             .addValue("tenant_id", tenant.getId())
                             .addValue("competition_id", competitionId)
-                            .addValue("created_at", now.getTime())
-                            .addValue("updated_at", now.getTime());
+                            .addValue("created_at", now.getTime() / 1000)
+                            .addValue("updated_at", now.getTime() / 1000);
                     String sql = "INSERT INTO visit_history (player_id, tenant_id, competition_id, created_at, updated_at) VALUES (:player_id, :tenant_id, :competition_id, :created_at, :updated_at)";
                     this.adminDb.update(sql, source);
                 }
@@ -1483,8 +1483,8 @@ public class Application {
                     psr.getCompetitionId(),
                     psr.getScore(),
                     psr.getRowNum(),
-                    psr.getCreatedAt().getTime(),
-                    psr.getUpdatedAt().getTime()
+                    psr.getCreatedAt().getTime() / 1000,
+                    psr.getUpdatedAt().getTime() / 1000
                 )
             );
         }
