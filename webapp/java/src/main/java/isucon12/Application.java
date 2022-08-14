@@ -1189,7 +1189,7 @@ public class Application {
             throw new WebException(HttpStatus.FORBIDDEN, "role player required");
         }
 
-        // player_scoreを読んでいるときに更新が走ると不整合が起こるのでロックを取得する
+        // player_scoreを読んでいるときに更新が走ると不整合が起こるのでロックを取得する 
         var lockObj = v.getTenantId().longValue() == 1 ? this : new Object();
         synchronized (lockObj) {
             try (Connection tenantDb = this.connectToTenantDB(v.getTenantId());) {
@@ -1252,7 +1252,7 @@ public class Application {
                         .addValue("tenant_id", tenant.getId())
                         .addValue("competition_id", competitionId);
                     pss = adminDb.query(
-                        "SELECT * FROM latest_player_score WHERE tenant_id = :tenant_id AND competition_id = :competition_id ORDER BY row_num DESC",
+                        "SELECT * FROM latest_player_score WHERE tenant_id = :tenant_id AND competition_id = :competition_id",
                         source,
                         (rs,ignore) -> 
                             new PlayerScoreRow(
@@ -1267,15 +1267,8 @@ public class Application {
                 }
 
                 List<CompetitionRank> ranks = new ArrayList<>();
-                Set<String> scoredPlayerSet = new HashSet<>();
                 {
                     for (PlayerScoreRow ps : pss) {
-                        // player_scoreが同一player_id内ではrow_numの降順でソートされているので
-                        // 現れたのが2回目以降のplayer_idはより大きいrow_numでスコアが出ているとみなせる
-                        if (scoredPlayerSet.contains(ps.getPlayerId())) {
-                            continue;
-                        }
-                        scoredPlayerSet.add(ps.getPlayerId());
                         PlayerRow p = this.retrievePlayer(tenantDb, ps.getPlayerId());
                         CompetitionRank competitionRank = new CompetitionRank();
                         competitionRank.setScore(ps.getScore());
@@ -1299,9 +1292,9 @@ public class Application {
 
                 List<CompetitionRank> pagedRanks = new ArrayList<>();
                 for (int i = 0; i < ranks.size(); i++) {
-                    if (i < rankAfter) {
-                        continue;
-                    }
+                    // if (i < rankAfter) {
+                    //     continue;
+                    // }
                     CompetitionRank rank = ranks.get(i);
 
                     CompetitionRank competitionRank = new CompetitionRank();
