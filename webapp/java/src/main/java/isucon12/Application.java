@@ -136,7 +136,7 @@ public class Application {
     private static final String ROLE_NONE = "none";
 
     private static final String TENANT_NAME_REG_PATTERN = "^[a-z][a-z0-9-]{0,61}[a-z0-9]$";
-    private static final int SQLITE_BUSY_TIMEOUT = 5;
+    private static final int SQLITE_BUSY_TIMEOUT = 10;
 
     /*
      * ENV
