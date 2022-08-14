@@ -66,3 +66,8 @@ CREATE TABLE `player` (
   updated_at BIGINT NOT NULL,
   INDEX (tenant_id)
 ) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4;
+
+INSERT INTO `player`(id, tenant_id, display_name, is_disqualified, created_at, updated_at)
+SELECT * FROM initial_player;
+-- LOAD DATA INFILE '/var/lib/mysql-files/players.csv' INTO TABLE initial_player FIELDS TERMINATED BY ',' (id, tenant_id, display_name, is_disqualified, created_at, updated_at);
+
