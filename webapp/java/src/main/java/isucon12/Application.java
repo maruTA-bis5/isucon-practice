@@ -1249,14 +1249,13 @@ public class Application {
 
                 List<PlayerScoreRow> pss = new ArrayList<>();
                 if (tenant.getId().longValue() == 1) {
-                    Set<String> foundPlayerIds = new HashSet<>();
                     PreparedStatement ps = tenantDb.prepareStatement("SELECT * FROM player_score WHERE tenant_id = ? AND competition_id = ? ORDER BY row_num DESC");
                     ps.setQueryTimeout(SQLITE_BUSY_TIMEOUT);
                     ps.setLong(1, tenant.getId());
                     ps.setString(2, competitionId);
                     ResultSet rs = ps.executeQuery();
                     while (rs.next()) {
-                        var row = new PlayerScoreRow(
+                        pss.add(new PlayerScoreRow(
                                 rs.getLong("tenant_id"),
                                 rs.getString("id"),
                                 rs.getString("player_id"),
@@ -1264,12 +1263,7 @@ public class Application {
                                 rs.getLong("score"),
                                 rs.getLong("row_num"),
                                 new Date(rs.getLong("created_at")),
-                                new Date(rs.getLong("updated_at")));
-                        if (foundPlayerIds.contains(row.getPlayerId())) {
-                            continue;
-                        }
-                        foundPlayerIds.add(row.getPlayerId());
-                        pss.add(row);
+                                new Date(rs.getLong("updated_at"))));
                     }
                 } else {
                     var source = new MapSqlParameterSource()
@@ -1304,7 +1298,15 @@ public class Application {
                     }
                 }
 
-                Collections.sort(ranks, Comparator.comparing(CompetitionRank::getScore).reversed());
+                Collections.sort(ranks, new Comparator<CompetitionRank>() {
+                    @Override
+                    public int compare(CompetitionRank o1, CompetitionRank o2) {
+                        if (o1.getScore().longValue() == o2.getScore().longValue()) {
+                            return Long.compare(o1.getRowNum(), o2.getRowNum());
+                        }
+                        return Long.compare(o2.getScore(), o1.getScore());
+                    }
+                });
 
                 List<CompetitionRank> pagedRanks = new ArrayList<>();
                 for (int i = 0; i < ranks.size(); i++) {
