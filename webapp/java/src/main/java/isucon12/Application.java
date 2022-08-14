@@ -777,7 +777,7 @@ public class Application {
         } catch (DatabaseException e) {
             throw new WebException(HttpStatus.INTERNAL_SERVER_ERROR, "error connectToTenantDb: ", e);
         } catch (SQLException e) {
-            throw new WebException(HttpStatus.INTERNAL_SERVER_ERROR, "error Select player: ", e);
+            throw new WebException(HttpStatus.INTERNAL_SERVER_ERROR, "error Select player: " + e.toString(), e);
         }
     }
 
