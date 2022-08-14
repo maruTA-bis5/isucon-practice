@@ -451,6 +451,25 @@ public class Application {
             pls.sort(Comparator.comparing(PlayerRow::getCreatedAt).reversed());
             return pls;
         }
+
+        public void disqualified(Connection tenantDb, String playerId) throws SQLException {
+            var query = "UPDATE player SET is_disqualified = true, updated_at = :updated_at WHERE id = :id";
+            var now = new Date().getTime();
+            var source = new MapSqlParameterSource()
+                .addValue("updated_at", now/1000)
+                .addValue("id", playerId);
+            if (adminDb.update(query, source) != 0) {
+                return;
+            }
+            // fallback
+            try (PreparedStatement ps = tenantDb.prepareStatement("UPDATE player SET is_disqualified = ?, updated_at = ? WHERE id = ?")) {
+                ps.setQueryTimeout(SQLITE_BUSY_TIMEOUT);
+                ps.setBoolean(1, true);
+                ps.setDate(2, new java.sql.Date(now));
+                ps.setString(3, playerId);
+                ps.executeUpdate();
+            }
+        }
     }
 
     // 参加者を認可する
@@ -874,19 +893,15 @@ public class Application {
             throw new WebException(HttpStatus.FORBIDDEN, "role organizer required");
         }
 
-        try ( Connection tenantDb = this.connectToTenantDB(v.getTenantId()); PreparedStatement ps = tenantDb.prepareStatement("UPDATE player SET is_disqualified = ?, updated_at = ? WHERE id = ?");) {
-            ps.setQueryTimeout(SQLITE_BUSY_TIMEOUT);
-            java.sql.Date now = new java.sql.Date(new Date().getTime());
-            ps.setBoolean(1, true);
-            ps.setDate(2, now);
-            ps.setString(3, playerId);
-            ps.executeUpdate();
-
+        try ( Connection tenantDb = this.connectToTenantDB(v.getTenantId())) {
+            tenantDb.setAutoCommit(false);
+            playerStore.disqualified(tenantDb, playerId);
             PlayerRow p = playerStore.retrievePlayer(tenantDb, playerId);
             if (p == null) {
                 throw new WebException(HttpStatus.NOT_FOUND, "player not found");
             }
 
+            tenantDb.commit();
             return new SuccessResult(true, new PlayerDisqualifiedHandlerResult(new PlayerDetail(p.getId(), p.getDisplayName(), p.getIsDisqualified())));
         } catch (DatabaseException e) {
             throw new WebException(HttpStatus.INTERNAL_SERVER_ERROR, "error connectToTenantDb: ", e);
