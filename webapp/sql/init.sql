@@ -43,8 +43,6 @@ SELECT
     tenant_id, player_id, competition_id, score, row_num, created_at, updated_at
 FROM player_score;
 
-CREATE INDEX IF NOT EXISTS `visit_history_ids` ON `visit_history` (`tenant_id`, `competition_id`, `player_id`, `created_at`);
-
 DROP TABLE IF EXISTS `competition_billing`;
 CREATE TABLE `competition_billing` (
     tenant_id BIGINT NOT NULL,
