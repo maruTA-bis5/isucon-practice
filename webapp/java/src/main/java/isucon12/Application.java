@@ -936,7 +936,8 @@ public class Application {
         }
 
         // DELETEしたタイミングで参照が来ると空っぽのランキングになるのでロックする
-        synchronized (this) {
+        var lockObj = v.getTenantId().longValue() == 1 ? this : new Object();
+        synchronized (lockObj) {
             try (Connection tenantDb = this.connectToTenantDB(v.getTenantId());) {
                 CompetitionRow comp = this.retrieveCompetition(tenantDb, competitionId);
                 if (comp == null) {
