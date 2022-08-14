@@ -516,8 +516,52 @@ public class Application {
             billingMap.put(vh.getPlayerId(), "visitor");
         }
 
+        if (tenantId == 1) {
         // player_scoreを読んでいるときに更新が走ると不整合が起こるのでロックを取得する
-        // synchronized (this) {
+        synchronized (this) {
+            try (var ps = tenantDb.prepareStatement("SELECT DISTINCT(player_id) AS player_id FROM player_score WHERE tenant_id = ? AND competition_id = ?")) {
+                // スコアを登録した参加者のIDを取得する
+                ps.setLong(0, tenantId);
+                ps.setString(1, competitionId);
+                var rs = ps.executeQuery();
+                Set<String> scoredPlayerIDs = new HashSet<>();
+                while(rs.next()) {
+                    scoredPlayerIDs.add(rs.getString("player_id"));
+                }
+
+                for (String pid : scoredPlayerIDs) {
+                    // スコアが登録されている参加者
+                    billingMap.put(pid, "player");
+                }
+
+                // 大会が終了している場合のみ請求金額が確定するので計算する
+                long playerCount = 0, visitorCount = 0;
+                if (this.isValidFinishedAt(comp.getFinishedAt())) {
+                    for (Map.Entry<String, String> entry : billingMap.entrySet()) {
+                        switch (entry.getValue()) {
+                        case "player":
+                            playerCount++;
+                            break;
+                        case "visitor":
+                            visitorCount++;
+                            break;
+                        }
+                    }
+                }
+                BillingReport br = new BillingReport();
+                br.setCompetitionId(comp.getId());
+                br.setCompetitionTitle(comp.getTitle());
+                br.setPlayerCount(playerCount);
+                br.setVisitorCount(visitorCount);
+                br.setBillingPlayerYen(100 * playerCount); // スコアを登録した参加者は100円
+                br.setBillingVisitorYen(10 * visitorCount); // ランキングを閲覧だけした(スコアを登録していない)参加者は10円
+                br.setBillingYen(100 * playerCount + 10 * visitorCount);
+                return br;
+            } catch (SQLException | DataAccessException e) {
+                throw new BillingReportByCompetitionException(String.format("error Select count player_score: tenantID=%d, competitionID=%s, ", tenantId, competitionId), e);
+            }
+        }
+        } else {
             try {
                 // スコアを登録した参加者のIDを取得する
                 source = new MapSqlParameterSource()
@@ -559,7 +603,7 @@ public class Application {
             } catch (DataAccessException e) {
                 throw new BillingReportByCompetitionException(String.format("error Select count player_score: tenantID=%d, competitionID=%s, ", tenantId, competitionId), e);
             }
-        // }
+        }
     }
 
     // SaaS管理者用API テナントごとの課金レポートを最大10件、テナントのid降順で取得する
@@ -1040,6 +1084,32 @@ public class Application {
                 }
 
                 List<PlayerScoreRow> pss = new ArrayList<>();
+                if (v.getTenantId().longValue() == 1) {
+
+                for (CompetitionRow c : cs) {
+                    // 最後にCSVに登場したスコアを採用する = row_numが一番大きいもの
+                    PreparedStatement ps = tenantDb.prepareStatement("SELECT * FROM player_score WHERE tenant_id = ? AND competition_id = ? AND player_id = ? ORDER BY row_num DESC LIMIT 1");
+                    ps.setQueryTimeout(SQLITE_BUSY_TIMEOUT);
+                    ps.setLong(1, v.getTenantId());
+                    ps.setString(2, c.getId());
+                    ps.setString(3, p.getId());
+                    ResultSet rs = ps.executeQuery();
+                    if (!rs.isBeforeFirst()) {
+                        // 行がない = スコアが記録されてない
+                        continue;
+                    }
+                    pss.add(new PlayerScoreRow(
+                            rs.getLong("tenant_id"),
+                            rs.getString("id"),
+                            rs.getString("player_id"),
+                            rs.getString("competition_id"),
+                            rs.getLong("score"),
+                            rs.getLong("row_num"),
+                            new Date(rs.getLong("created_at")),
+                            new Date(rs.getLong("updated_at"))));
+                }
+
+                } else {
                 for (CompetitionRow c : cs) {
                     // 最後にCSVに登場したスコアを採用する = row_numが一番大きいもの
                     var source = new MapSqlParameterSource()
@@ -1058,6 +1128,7 @@ public class Application {
                             rs.getLong("row_num"),
                             new Date(rs.getLong("created_at")),
                             new Date(rs.getLong("updated_at")))));
+                }
                 }
 
                 List<PlayerScoreDetail> psds = new ArrayList<>();
@@ -1133,7 +1204,24 @@ public class Application {
                 }
 
                 List<PlayerScoreRow> pss = new ArrayList<>();
-                {
+                if (tenant.getId().longValue() == 1) {
+                    PreparedStatement ps = tenantDb.prepareStatement("SELECT * FROM player_score WHERE tenant_id = ? AND competition_id = ? ORDER BY row_num DESC");
+                    ps.setQueryTimeout(SQLITE_BUSY_TIMEOUT);
+                    ps.setLong(1, tenant.getId());
+                    ps.setString(2, competitionId);
+                    ResultSet rs = ps.executeQuery();
+                    while (rs.next()) {
+                        pss.add(new PlayerScoreRow(
+                                rs.getLong("tenant_id"),
+                                rs.getString("id"),
+                                rs.getString("player_id"),
+                                rs.getString("competition_id"),
+                                rs.getLong("score"),
+                                rs.getLong("row_num"),
+                                new Date(rs.getLong("created_at")),
+                                new Date(rs.getLong("updated_at"))));
+                    }
+                } else {
                     var source = new MapSqlParameterSource()
                         .addValue("tenant_id", tenant.getId())
                         .addValue("competition_id", competitionId);
@@ -1351,53 +1439,9 @@ public class Application {
             // 競技中の最後に計測したものを参照して、講評記事などで使わせていただきます
             res.setAppeal("");
 
-            // List<Long> tenantIds = adminDb.query("SELECT id FROM tenant", (rs, index) -> rs.getLong("id"));
-            // tenantIds.parallelStream()
-            //     .map(this::connectToTenantDBUnchecked)
-            //     .forEach(this::selectLatestPlayerScores);
-        
             return new SuccessResult(true, res);
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(String.format("error Runtime.exec: %s", e.getMessage()));
-        }
-    }
-
-    private void selectLatestPlayerScores(Connection tenantDb) {
-        var query = """
-        SELECT tenant_id, player_id, competition_id, score, row_num, created_at, updated_at
-        FROM player_score ps
-        WHERE (tenant_id, player_id, competition_id, row_num) = (
-            SELECT tenant_id, player_id, competition_id, MAX(row_num) OVER(PARTITION BY player_id)
-            FROM player_score pps
-            WHERE (ps.tenant_id, ps.player_id, ps.competition_id) = (pps.tenant_id, pps.player_id, pps.competition_id)
-        )
-                """;
-        try (ResultSet rs = tenantDb.createStatement().executeQuery(query)) {
-            List<PlayerScoreRow> rows = new ArrayList<>();
-            int i = 0;
-            while(rs.next()) {
-                var row = new PlayerScoreRow(
-                    rs.getLong("tenant_id"),
-                    null,
-                    rs.getString("player_id"),
-                    rs.getString("competition_id"),
-                    rs.getLong("score"),
-                    rs.getLong("row_num"),
-                    new Date(rs.getLong("created_at")),
-                    new Date(rs.getLong("updated_at")));
-                rows.add(row);
-                i++;
-                if (i > 100) {
-                    batchInsertLatestPlayerScores(rows);
-                    rows.clear();
-                    i = 0;
-                }
-            }
-            if (!rows.isEmpty()) {
-                batchInsertLatestPlayerScores(rows);
-            }
-        } catch (SQLException e) {
-            throw new IllegalStateException("Could not retrieve latest scores from tenantDb", e);
         }
     }
 
