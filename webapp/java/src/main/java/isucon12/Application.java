@@ -242,6 +242,12 @@ public class Application {
         .setMeterProvider(sdkMeterProvider)
         .setPropagators(ContextPropagators.create(W3CTraceContextPropagator.getInstance()))
         .buildAndRegisterGlobal();
+
+        try {
+            Class.forName("io.opentelemetry.instrumentation.jdbc.OpenTelemetryDriver");
+        } catch (ClassNotFoundException e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     // リクエストヘッダをパースしてViewerを返す
