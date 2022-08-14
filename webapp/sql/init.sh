@@ -14,7 +14,7 @@ mysql -u"$ISUCON_DB_USER" \
 		-p"$ISUCON_DB_PASSWORD" \
 		--host "$ISUCON_DB_HOST" \
 		--port "$ISUCON_DB_PORT" \
-		"$ISUCON_DB_NAME" < init.sql
+		"$ISUCON_DB_NAME" < init.sql 2>&1 | tee /tmp/init.sql.log
 
 # SQLiteのデータベースを初期化
 rm -f /home/isucon/webapp/tenant_db/*.db
