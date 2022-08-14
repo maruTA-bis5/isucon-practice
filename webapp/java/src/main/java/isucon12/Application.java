@@ -377,7 +377,7 @@ public class Application {
                 .addValue("created_at", now)
                 .addValue("updated_at", now);
             adminDb.update(
-                "INSERT INTO player (id, tenant_id, display_name, is_disqualified, created_at, updated_at) VALUES (:id, :tenant_id, :display_name, false, ;created_at, :updated_at)",
+                "INSERT INTO player (id, tenant_id, display_name, is_disqualified, created_at, updated_at) VALUES (:id, :tenant_id, :display_name, false, :created_at, :updated_at)",
                 source
             );
             return id;
