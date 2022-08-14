@@ -4,6 +4,10 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -30,6 +34,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.StringJoiner;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -155,9 +161,12 @@ public class Application {
     private String ISUCON_BASE_HOSTNAME;
     @Value("${ISUCON_ADMIN_HOSTNAME:admin.t.isucon.dev}")
     private String ISUCON_ADMIN_HOSTNAME;
+    @Value("${ISUCON_BILLING_CALCULATE_SERVICE:localhost:3000}")
+    private String ISUCON_BILLING_CALCULATE_SERVICE;
 
     private PlayerStore playerStore = new PlayerStore();
     private Connection tenantDb;
+    private ExecutorService workerService;
 
     @PostConstruct void onPostConstruct() {
         jwtVerifier = JWT.require(Algorithm.RSA256(this.readPublicKeyFromFile(ISUCON_JWT_KEY_FILE), null)).build();
@@ -166,6 +175,7 @@ public class Application {
         } catch (DatabaseException e) {
             throw new IllegalStateException(e);
         }
+        workerService = Executors.newCachedThreadPool();
     }
 
     public String tenantDBPath(long id) {
@@ -895,6 +905,16 @@ public class Application {
         }
     }
 
+    @PostMapping("/api/internal/tenant/{tenantId}/competition/{competitionId}/finish")
+    @Transactional
+    public void internalCompetitionFinishHandler(HttpServletRequest req, @PathVariable("tenantId") long tenantId, @PathVariable("competitionId") String competitionId) {
+        try {
+            billingReportByCompetition(tenantId, competitionId);
+        } catch (BillingReportByCompetitionException e) {
+            throw new WebException(HttpStatus.INTERNAL_SERVER_ERROR, "billing report creation failure: " + e.toString(), e);
+        }
+    }
+
     // テナント管理者向けAPI
     // POST /api/organizer/competition/{competitionId}/finish
     // 大会を終了する
@@ -921,6 +941,20 @@ public class Application {
             adminDb.update(
                 "UPDATE competition SET finished_at = :finished_at, updated_at = :updated_at WHERE id = :id",
                 params);
+
+            workerService.submit(() -> {
+                var client = HttpClient.newHttpClient();
+                var apireq = HttpRequest.newBuilder()
+                    .uri(URI.create("http://" + ISUCON_BILLING_CALCULATE_SERVICE
+                        + "/api/internal/tenant/%d/competition/%s/finish".formatted(v.getTenantId(), id)))
+                    .build();
+                try {
+                    client.send(apireq, HttpResponse.BodyHandlers.ofString());
+                } catch (IOException | InterruptedException e) {
+                    throw new IllegalStateException(e);
+                }
+            });
+
             return new SuccessResult(true, null);
         } catch (RetrieveCompetitionException e) {
             throw new WebException(HttpStatus.INTERNAL_SERVER_ERROR, "error retrieveCompetition: ", e);

@@ -1,1 +1,2 @@
 ISUCON_DB_HOST=isuports-1.t.isucon.dev
+ISUCON_BILLING_CALCULATE_SERVICE=isuports-2.t.isucon.dev:3000
