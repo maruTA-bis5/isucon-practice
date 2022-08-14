@@ -879,28 +879,25 @@ public class Application {
             throw new WebException(HttpStatus.FORBIDDEN, "role organizer required");
         }
 
-        try (Connection tenantDb = this.connectToTenantDB(v.getTenantId()); PreparedStatement ps = tenantDb.prepareStatement("INSERT INTO competition (id, tenant_id, title, finished_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)");) {
-            tenantDb.setAutoCommit(false);
-            java.sql.Date now = new java.sql.Date(new Date().getTime());
+        try {
             String id = this.dispenseID();
-
-            ps.setQueryTimeout(SQLITE_BUSY_TIMEOUT * 10);
-            ps.setString(1, id);
-            ps.setLong(2, v.getTenantId());
-            ps.setString(3, title);
-            ps.setDate(4, null);
-            ps.setDate(5, now);
-            ps.setDate(6, now);
-            ps.executeUpdate();
-            tenantDb.commit();
+            var now = new Date().getTime() / 1000;
+            adminDb.update(
+                """
+                    INSERT INTO competition (id, tenant_id, title, finished_at, created_at, updated_at)
+                    VALUES (:id, :tenant_id, :title, NULL, :created_at, updated_at)
+                """,
+                new MapSqlParameterSource()
+                    .addValue("id", id)
+                    .addValue("tenant_id", v.getTenantId())
+                    .addValue("title", title)
+                    .addValue("creted_at", now)
+                    .addValue("updated_at", now)
+            );
 
             return new SuccessResult(true, new CompetitionsAddHandlerResult(new CompetitionDetail(id, title, false)));
-        } catch (DatabaseException e) {
-            throw new WebException(HttpStatus.INTERNAL_SERVER_ERROR, "error connectToTenantDb: ", e);
         } catch (DispenseIdException e) {
             throw new WebException(HttpStatus.INTERNAL_SERVER_ERROR, "error dispenseID: ", e);
-        } catch (SQLException e) {
-            throw new WebException(HttpStatus.INTERNAL_SERVER_ERROR, "error Insert competition: ", e);
         }
     }
 
@@ -1040,21 +1037,18 @@ public class Application {
         Connection tenantDb = null;
         try {
             tenantDb = this.connectToTenantDB(v.getTenantId());
-            PreparedStatement ps = tenantDb.prepareStatement("SELECT * FROM competition WHERE tenant_id=? ORDER BY created_at DESC");
-            ps.setQueryTimeout(SQLITE_BUSY_TIMEOUT);
-            ps.setLong(1, v.getTenantId());
-            ResultSet rs = ps.executeQuery();
-
-            List<CompetitionRow> cs = new ArrayList<>();
-            while (rs.next()) {
-                cs.add(new CompetitionRow(
+            List<CompetitionRow> cs = adminDb.query(
+                "SELECT * FROM competition WHERE tenant_id=:tenant_id ORDER BY created_at DESC",
+                new MapSqlParameterSource("tenant_id", v.getTenantId()),
+                (rs, idx) -> 
+                    new CompetitionRow(
                         rs.getLong("tenant_id"),
                         rs.getString("id"),
                         rs.getString("title"),
                         new Date(rs.getLong("finished_at")),
                         new Date(rs.getLong("created_at")),
-                        new Date(rs.getLong("updated_at"))));
-            }
+                        new Date(rs.getLong("updated_at")))
+            );
 
             List<BillingReport> tbrs = new ArrayList<>();
             for (CompetitionRow comp : cs) {
@@ -1065,8 +1059,6 @@ public class Application {
             return new SuccessResult(true, new BillingHandlerResult(tbrs));
         } catch (DatabaseException e) {
             throw new WebException(HttpStatus.INTERNAL_SERVER_ERROR, "error connectToTenantDb: ", e);
-        } catch (SQLException e) {
-            throw new WebException(HttpStatus.INTERNAL_SERVER_ERROR, "error Select competition: ", e);
         } catch (BillingReportByCompetitionException e) {
             throw new WebException(HttpStatus.INTERNAL_SERVER_ERROR, "error billingReportByCompetition: ", e);
         } catch (NumberFormatException e) {
