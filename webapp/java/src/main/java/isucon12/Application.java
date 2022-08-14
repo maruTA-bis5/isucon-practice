@@ -1490,7 +1490,8 @@ public class Application {
         }
         adminDb.update(
             "INSERT INTO latest_player_score (tenant_id, player_id, competition_id, score, row_num, created_at, updated_at) VALUES "
-                + values.toString(),
+                + values.toString()
+                + " ON DUPLICATE KEY UPDATE score = VALUES(score), created_at = VALUES(created_at), updated_at = VALUES(updated_at), row_num = VALUES(row_num)",
             new EmptySqlParameterSource()
         );
     }
