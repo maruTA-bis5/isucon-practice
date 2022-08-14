@@ -545,6 +545,7 @@ public class Application {
         // player_scoreを読んでいるときに更新が走ると不整合が起こるのでロックを取得する
         synchronized (this) {
             try (var ps = tenantDb.prepareStatement("SELECT DISTINCT(player_id) AS player_id FROM player_score WHERE tenant_id = ? AND competition_id = ?")) {
+                ps.setQueryTimeout(SQLITE_BUSY_TIMEOUT);
                 // スコアを登録した参加者のIDを取得する
                 ps.setLong(1, tenantId);
                 ps.setString(2, competitionId);
