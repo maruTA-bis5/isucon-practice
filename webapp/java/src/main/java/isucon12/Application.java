@@ -1351,7 +1351,7 @@ public class Application {
             // 競技中の最後に計測したものを参照して、講評記事などで使わせていただきます
             res.setAppeal("");
 
-            List<Long> tenantIds = adminDb.query("SELECT tenant_id FROM tenant", (rs, index) -> rs.getLong("tenant_id"));
+            List<Long> tenantIds = adminDb.query("SELECT id FROM tenant", (rs, index) -> rs.getLong("id"));
             List<? extends SqlParameterSource> latestScores = tenantIds.parallelStream()
                 .map(this::connectToTenantDBUnchecked)
                 .map(this::selectLatestPlayerScores)
