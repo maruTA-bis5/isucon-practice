@@ -111,6 +111,10 @@ name = 'GET /api/player/competition/:competition_id/ranking'
 regexp = '^GET /api/player/competition/[0-9a-zA-Z\-]+/score'
 name = 'GET /api/player/competition/:competition_id/score'
 
+[[bundle]]
+regexp = '^POST /api/internal/tenant/[0-9a-zA-Z\-]+/competition/[0-9a-zA-Z\-]+/finish'
+name = 'POST /api/internal/tenant/:tenant_id/competition/:competition_id/finish'
+
 ################################################################################
 # Replace
 ################################################################################
