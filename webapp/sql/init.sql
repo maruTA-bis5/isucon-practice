@@ -55,3 +55,14 @@ CREATE TABLE `competition_billing` (
     billing_yen BIGINT GENERATED ALWAYS AS (billing_player_yen + billing_visitor_yen) STORED,
     PRIMARY KEY (tenant_id, competition_id)
 ) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4;
+
+DROP TABLE IF EXISTS `player`;
+CREATE TABLE `player` {
+  id VARCHAR(255) NOT NULL PRIMARY KEY,
+  tenant_id BIGINT NOT NULL,
+  display_name TEXT NOT NULL,
+  is_disqualified BOOLEAN NOT NULL,
+  created_at BIGINT NOT NULL,
+  updated_at BIGINT NOT NULL,
+  INDEX (tenant_id)
+} ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4;
