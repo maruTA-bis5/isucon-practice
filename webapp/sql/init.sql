@@ -13,4 +13,4 @@ CREATE TABLE `latest_player_score` (
     created_at BIGINT NOT NULL,
     updated_at BIGINT NOT NULL,
     PRIMARY KEY (`tenant_id`, `competition_id`, `player_id`)
-);
+) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4;
