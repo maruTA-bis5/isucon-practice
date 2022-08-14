@@ -57,7 +57,7 @@ CREATE TABLE `competition_billing` (
 ) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4;
 
 DROP TABLE IF EXISTS `player`;
-CREATE TABLE `player` {
+CREATE TABLE `player` (
   id VARCHAR(255) NOT NULL PRIMARY KEY,
   tenant_id BIGINT NOT NULL,
   display_name TEXT NOT NULL,
@@ -65,4 +65,4 @@ CREATE TABLE `player` {
   created_at BIGINT NOT NULL,
   updated_at BIGINT NOT NULL,
   INDEX (tenant_id)
-} ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4;
