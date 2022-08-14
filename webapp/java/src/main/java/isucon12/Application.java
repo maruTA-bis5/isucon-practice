@@ -55,6 +55,7 @@ import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.jdbc.core.namedparam.SqlParameterSource;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -155,9 +156,15 @@ public class Application {
     private String ISUCON_ADMIN_HOSTNAME;
 
     private PlayerStore playerStore = new PlayerStore();
+    private Connection tenantDb;
 
     @PostConstruct void onPostConstruct() {
         jwtVerifier = JWT.require(Algorithm.RSA256(this.readPublicKeyFromFile(ISUCON_JWT_KEY_FILE), null)).build();
+        try {
+            tenantDb = connectToTenantDB(1);
+        } catch (DatabaseException e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     public String tenantDBPath(long id) {
@@ -526,7 +533,7 @@ public class Application {
         }
     }
 
-    private BillingReport billingReportByCompetition(Connection tenantDb, long tenantId, String competitionId) throws BillingReportByCompetitionException {
+    private BillingReport billingReportByCompetition(long tenantId, String competitionId) throws BillingReportByCompetitionException {
         CompetitionRow comp;
         try {
             comp = this.retrieveCompetition(competitionId);
@@ -597,7 +604,6 @@ public class Application {
 
         if (tenantId == 1) {
         // player_scoreを読んでいるときに更新が走ると不整合が起こるのでロックを取得する
-        // synchronized (this) {
             try (var ps = tenantDb.prepareStatement("SELECT DISTINCT(player_id) AS player_id FROM player_score WHERE tenant_id = ? AND competition_id = ?")) {
                 ps.setQueryTimeout(SQLITE_BUSY_TIMEOUT);
                 // スコアを登録した参加者のIDを取得する
@@ -749,35 +755,26 @@ public class Application {
             tb.setName(t.getName());
             tb.setDisplayName(t.getDisplayName());
 
-            try (Connection tenantDb = this.connectToTenantDB(t.getId()); PreparedStatement ps = tenantDb.prepareStatement("SELECT * FROM competition WHERE tenant_id=?");) {
-                tenantDb.setAutoCommit(false);
-                ps.setQueryTimeout(SQLITE_BUSY_TIMEOUT);
-                ps.setLong(1, t.getId());
-                ResultSet rs = ps.executeQuery();
-
-                List<CompetitionRow> cs = new ArrayList<>();
-                while (rs.next()) {
-                    cs.add(new CompetitionRow(
+            try {
+                List<CompetitionRow> cs = adminDb.query(
+                    "SELECT * FROM competition WHERE tenant_id=:tenant_id",
+                    new MapSqlParameterSource("tenant_id", t.getId()),
+                    (rs, idx) -> new CompetitionRow(
                             rs.getLong("tenant_id"),
                             rs.getString("id"),
                             rs.getString("title"),
                             new Date(rs.getLong("finished_at")),
                             new Date(rs.getLong("created_at")),
-                            new Date(rs.getLong("updated_at"))));
-                }
+                            new Date(rs.getLong("updated_at")))
+                );
 
                 for (CompetitionRow comp : cs) {
-                    BillingReport report = this.billingReportByCompetition(tenantDb, t.getId(), comp.getId());
+                    BillingReport report = this.billingReportByCompetition(t.getId(), comp.getId());
                     Long billingYen = tb.getBillingYen() == null ? 0L : tb.getBillingYen();
                     billingYen += report.getBillingYen();
                     tb.setBillingYen(billingYen);
                 }
                 tenantBillings.add(tb);
-                tenantDb.commit();
-            } catch (DatabaseException e) {
-                throw new WebException(HttpStatus.INTERNAL_SERVER_ERROR, "failed to connectToTenantDb: ", e);
-            } catch (SQLException e) {
-                throw new WebException(HttpStatus.INTERNAL_SERVER_ERROR, "failed to Select competition: ", e);
             } catch (BillingReportByCompetitionException e) {
                 throw new WebException(HttpStatus.INTERNAL_SERVER_ERROR, "failed to billingReportByCompetition: ", e);
             }
@@ -824,21 +821,17 @@ public class Application {
         }
 
         List<PlayerDetail> pds = new ArrayList<>();
-        try (Connection tenantDb = this.connectToTenantDB(v.getTenantId());) {
+        try {
             for (String displayName : displayNames) {
                 String id = playerStore.insertPlayer(v.getTenantId(), displayName);
                 PlayerRow p = playerStore.retrievePlayer(id);
                 pds.add(new PlayerDetail(p.getId(), p.getDisplayName(), p.getIsDisqualified()));
             }
             return new SuccessResult(true, new PlayersAddHandlerResult(pds));
-        } catch (DatabaseException e) {
-            throw new WebException(HttpStatus.INTERNAL_SERVER_ERROR, "error connectToTenantDb: ", e);
         } catch (DispenseIdException e) {
             throw new WebException(HttpStatus.INTERNAL_SERVER_ERROR, "error dispenseID: ", e);
         } catch (RetrievePlayerException e) {
             throw new WebException(HttpStatus.INTERNAL_SERVER_ERROR, "error retrievePlayer: ", e);
-        } catch (SQLException e) {
-            throw new WebException(HttpStatus.INTERNAL_SERVER_ERROR, "error connectToTenantDB: ", e);
         }
     }
 
@@ -846,13 +839,14 @@ public class Application {
     // POST /api/organizer/player/{playerId}/disqualified
     // 参加者を失格にする
     @PostMapping("/api/organizer/player/{playerId}/disqualified")
+    @Transactional
     public SuccessResult playerDisqualifiedHandler(HttpServletRequest req, @PathVariable("playerId") String playerId) {
         Viewer v = this.parseViewer(req);
         if (!v.getRole().equals(ROLE_ORGANIZER)) {
             throw new WebException(HttpStatus.FORBIDDEN, "role organizer required");
         }
 
-        try ( Connection tenantDb = this.connectToTenantDB(v.getTenantId())) {
+        try {
             PlayerRow p = playerStore.retrievePlayer(playerId);
             if (p == null) {
                 throw new WebException(HttpStatus.NOT_FOUND, "player not found");
@@ -860,8 +854,6 @@ public class Application {
             playerStore.disqualified(playerId);
 
             return new SuccessResult(true, new PlayerDisqualifiedHandlerResult(new PlayerDetail(p.getId(), p.getDisplayName(), true)));
-        } catch (DatabaseException e) {
-            throw new WebException(HttpStatus.INTERNAL_SERVER_ERROR, "error connectToTenantDb: ", e);
         } catch (SQLException e) {
             throw new WebException(HttpStatus.INTERNAL_SERVER_ERROR, String.format("error Update player id=%s: ", playerId), e);
         } catch (RetrievePlayerException e) {
@@ -873,6 +865,7 @@ public class Application {
     // POST /api/organizer/competitions/add
     // 大会を追加する
     @PostMapping("/api/organizer/competitions/add")
+    @Transactional
     public SuccessResult competitionsAddHandler(HttpServletRequest req, @ModelAttribute(name = "title") String title) {
         Viewer v = this.parseViewer(req);
         if (!v.getRole().equals(ROLE_ORGANIZER)) {
@@ -905,6 +898,7 @@ public class Application {
     // POST /api/organizer/competition/{competitionId}/finish
     // 大会を終了する
     @PostMapping("/api/organizer/competition/{competitionId}/finish")
+    @Transactional
     public SuccessResult competitionFinishHandler(HttpServletRequest req, @PathVariable("competitionId") String id) {
         Viewer v = this.parseViewer(req);
         if (!v.getRole().equals(ROLE_ORGANIZER)) {
@@ -936,6 +930,7 @@ public class Application {
     // POST /api/organizer/competition/{competitionId}/score
     // 大会のスコアをCSVでアップロードする
     @PostMapping("/api/organizer/competition/{competitionId}/score")
+    @Transactional
     public SuccessResult competitionScoreHandler(HttpServletRequest req, @PathVariable("competitionId") String competitionId, @RequestParam("scores") MultipartFile multipartFile) {
         Viewer v = this.parseViewer(req);
         if (!v.getRole().equals(ROLE_ORGANIZER)) {
@@ -1034,9 +1029,7 @@ public class Application {
             throw new WebException(HttpStatus.FORBIDDEN, "role organizer required");
         }
 
-        Connection tenantDb = null;
         try {
-            tenantDb = this.connectToTenantDB(v.getTenantId());
             List<CompetitionRow> cs = adminDb.query(
                 "SELECT * FROM competition WHERE tenant_id=:tenant_id ORDER BY created_at DESC",
                 new MapSqlParameterSource("tenant_id", v.getTenantId()),
@@ -1052,13 +1045,11 @@ public class Application {
 
             List<BillingReport> tbrs = new ArrayList<>();
             for (CompetitionRow comp : cs) {
-                BillingReport report = this.billingReportByCompetition(tenantDb, v.getTenantId(), comp.getId());
+                BillingReport report = this.billingReportByCompetition(v.getTenantId(), comp.getId());
                 tbrs.add(report);
             }
 
             return new SuccessResult(true, new BillingHandlerResult(tbrs));
-        } catch (DatabaseException e) {
-            throw new WebException(HttpStatus.INTERNAL_SERVER_ERROR, "error connectToTenantDb: ", e);
         } catch (BillingReportByCompetitionException e) {
             throw new WebException(HttpStatus.INTERNAL_SERVER_ERROR, "error billingReportByCompetition: ", e);
         } catch (NumberFormatException e) {
@@ -1081,7 +1072,7 @@ public class Application {
         // var lockObj = v.getTenantId().longValue() == 1 ? this : new Object();
         // synchronized (lockObj) {
 
-            try (Connection tenantDb = this.connectToTenantDB(v.getTenantId());) {
+            try {
                 this.authorizePlayer(v.getPlayerId());
 
                 PlayerRow p = playerStore.retrievePlayer(playerId);
@@ -1157,8 +1148,6 @@ public class Application {
                 }
 
                 return new SuccessResult(true, new PlayerHandlerResult(new PlayerDetail(p.getId(), p.getDisplayName(), p.getIsDisqualified()), psds));
-            } catch (DatabaseException e) {
-                throw new WebException(HttpStatus.INTERNAL_SERVER_ERROR, "error connectToTenantDb: ", e);
             } catch (SQLException e) {
                 throw new WebException(HttpStatus.INTERNAL_SERVER_ERROR, "error tenantdb SQL: ", e);
             } catch (NumberFormatException e) {
@@ -1186,7 +1175,7 @@ public class Application {
         // player_scoreを読んでいるときに更新が走ると不整合が起こるのでロックを取得する 
         // var lockObj = v.getTenantId().longValue() == 1 ? this : new Object();
         // synchronized (lockObj) {
-            try (Connection tenantDb = this.connectToTenantDB(v.getTenantId());) {
+            try {
                 this.authorizePlayer(v.getPlayerId());
 
                 // 大会の存在確認
@@ -1306,8 +1295,6 @@ public class Application {
                 return new SuccessResult(true, new CompetitionRankingHandlerResult(new CompetitionDetail(comp.getId(), comp.getTitle(), this.isValidFinishedAt(comp.getFinishedAt())), pagedRanks));
             } catch (DataAccessException e) {
                 throw new WebException(HttpStatus.INTERNAL_SERVER_ERROR, "error admindb SQL: ", e);
-            } catch (DatabaseException e) {
-                throw new WebException(HttpStatus.INTERNAL_SERVER_ERROR, "error connectToTenantDb: ", e);
             } catch (SQLException e) {
                 throw new WebException(HttpStatus.INTERNAL_SERVER_ERROR, "error tenantdb SQL: ", e);
             } catch (RetrievePlayerException e) {
@@ -1426,6 +1413,7 @@ public class Application {
      * データベースの初期化などが実行されるため、スキーマを変更した場合などは適宜改変すること
      */
     @PostMapping("/initialize")
+    @Transactional
     public SuccessResult initializeHandler() {
         try {
             Process p = Runtime.getRuntime().exec(INITIALIZE_SCRIPT);
