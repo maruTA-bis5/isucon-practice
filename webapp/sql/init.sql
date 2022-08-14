@@ -71,3 +71,18 @@ INSERT INTO `player`(id, tenant_id, display_name, is_disqualified, created_at, u
 SELECT * FROM initial_player;
 -- LOAD DATA INFILE '/var/lib/mysql-files/players.csv' INTO TABLE initial_player FIELDS TERMINATED BY ',' (id, tenant_id, display_name, is_disqualified, created_at, updated_at);
 
+
+DROP TABLE IF EXISTS `competition`;
+CREATE TABLE `competition` (
+    id VARCHAR(255) NOT NULL PRIMARY KEY,
+    tenant_id BIGINT NOT NULL,
+    title TEXT NOT NULL,
+    finished_at BIGINT NULL,
+    created_at BIGINT NOT NULL,
+    updated_at BIGINT NOT NULL,
+    INDEX (tenant_id, created_at)
+) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4;
+
+INSERT INTO `competition`(id, tenant_id, title, finished_at, created_at, updated_at)
+SELECT * FROM initial_competition;
+-- LOAD DATA INFILE '/var/lib/mysql-files/competitions.csv' INTO TABLE initial_competition FIELDS TERMINATED BY ',' (id, tenant_id, title, @fin, created_at, updated_at) SET set finished_at = nullif(@fin, '');
