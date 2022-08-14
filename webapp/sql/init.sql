@@ -14,3 +14,6 @@ CREATE TABLE `latest_player_score` (
     updated_at BIGINT NOT NULL,
     PRIMARY KEY (`tenant_id`, `competition_id`, `player_id`)
 ) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4;
+
+DROP INDEX IF EXISTS `visit_history_idx`;
+CREATE INDEX IF NOT EXISTS `visit_history_ids` ON `visit_history` (`tenant_id`, `competition_id`, `player_id`, `created_at`);
