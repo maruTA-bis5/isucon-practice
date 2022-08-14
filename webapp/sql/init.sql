@@ -15,6 +15,10 @@ CREATE TABLE `latest_player_score` (
     PRIMARY KEY (`tenant_id`, `competition_id`, `player_id`)
 ) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4;
 
+/*
+事前に作っておく。初期データ時点の最新スコア
+LOAD DATA INFILE '/var/lib/mysql-files/latest_scores.csv' INTO TABLE player_score FIELDS TERMINATED BY ',' (id, tenant_id, player_id, competition_id, score, row_num, created_at, updated_at);
+
 DROP TABLE IF EXISTS player_score;
 CREATE TABLE player_score (
     id VARCHAR(255) NOT NULL PRIMARY KEY,
@@ -32,6 +36,8 @@ INTO TABLE
     player_score
 FIELDS TERMINATED BY ','
 ;
+*/
+
 INSERT INTO latest_player_score (tenant_id, player_id, competition_id, score, row_num, created_at, updated_at)
 SELECT
     tenant_id, player_id, competition_id, score, row_num, created_at, updated_at
