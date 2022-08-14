@@ -1142,7 +1142,7 @@ public class Application {
                         .addValue("competition_id", c.getId())
                         .addValue("player_id", p.getId());
                     pss.addAll(adminDb.query(
-                        "SELECT * FROM latest_player_score WHERE tenant_id = :tenant_id AND competition_id = competition_id AND player_id = player_id ",
+                        "SELECT * FROM latest_player_score WHERE tenant_id = :tenant_id AND competition_id = :competition_id AND player_id = :player_id ",
                         source,
                         (rs,ignore) -> new PlayerScoreRow(
                             rs.getLong("tenant_id"),
