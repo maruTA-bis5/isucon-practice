@@ -47,6 +47,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.dao.DataAccessException;
+import org.springframework.dao.DeadlockLoserDataAccessException;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.RowMapper;
@@ -1449,11 +1450,21 @@ public class Application {
                 )
             );
         }
+        try {
         adminDb.update(
             "INSERT INTO latest_player_score (tenant_id, player_id, competition_id, score, row_num, created_at, updated_at) VALUES "
                 + values.toString()
                 + " ON DUPLICATE KEY UPDATE score = VALUES(score), created_at = VALUES(created_at), updated_at = VALUES(updated_at), row_num = VALUES(row_num)",
             new EmptySqlParameterSource()
         );
+        } catch (DeadlockLoserDataAccessException e) {
+            // retry
+            try {
+                Thread.sleep(10);
+            } catch (InterruptedException ignore) {
+                // ignore
+            }
+            batchInsertLatestPlayerScores(playerScoreRows);
+        }
     }
 }
