@@ -380,7 +380,7 @@ public class Application {
                     new Date(rs.getLong("created_at")),
                     new Date(rs.getLong("updated_at")));
         } catch (SQLException e) {
-            throw new RetrievePlayerException(String.format("error Select Player: id=%s, ", id), e);
+            throw new RetrievePlayerException(String.format("error Select Player: id=%s, ", id) + e.toString(), e);
         }
     }
 
