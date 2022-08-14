@@ -144,13 +144,13 @@ public class Application {
     public Connection connectToTenantDB(long id) throws DatabaseException {
         String tenantDBPath = this.tenantDBPath(id);
         if (!new File(tenantDBPath).exists()) {
-            throw new DatabaseException(String.format("failed to open tenant DB: %s", tenantDBPath));
+            throw new DatabaseException(String.format("failed to open tenant DB (not found): %s", tenantDBPath));
         }
 
         try {
             return DriverManager.getConnection(String.format("jdbc:log4jdbc:sqlite:%s", tenantDBPath));
         } catch (SQLException e) {
-            throw new DatabaseException(String.format("failed to open tenant DB: %s", e.getMessage()));
+            throw new DatabaseException(String.format("failed to open tenant DB (could not connect): %s", e.getMessage()), e);
         }
     }
 
