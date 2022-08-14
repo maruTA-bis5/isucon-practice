@@ -873,7 +873,7 @@ public class Application {
             java.sql.Date now = new java.sql.Date(new Date().getTime());
             String id = this.dispenseID();
 
-            ps.setQueryTimeout(SQLITE_BUSY_TIMEOUT);
+            ps.setQueryTimeout(SQLITE_BUSY_TIMEOUT * 10);
             ps.setString(1, id);
             ps.setLong(2, v.getTenantId());
             ps.setString(3, title);
