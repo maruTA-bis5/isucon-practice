@@ -26,7 +26,6 @@ CREATE TABLE player_score (
     created_at BIGINT NOT NULL,
     updated_at BIGINT NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4;
-SET local_infile=1;
 LOAD DATA LOCAL
     INFILE '/home/isucon/webapp/tenant_db/latest_scores.csv'
 INTO TABLE
