@@ -40,5 +40,5 @@ tasks.named('test') {
 	useJUnitPlatform()
 }
 bootRun {
-	jvmArgs = ['-Xmx3g', '-Xms3g']
+	jvmArgs = ['-Xmx2g', '-Xms2g']
 }
