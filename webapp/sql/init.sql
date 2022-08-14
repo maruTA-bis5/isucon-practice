@@ -28,12 +28,10 @@ CREATE TABLE player_score (
 ) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4;
 SET local_infile=1;
 LOAD DATA LOCAL
-    IN FILE '/home/isucon/webapp/tenant_db/latest_scores.csv'
+    INFILE '/home/isucon/webapp/tenant_db/latest_scores.csv'
 INTO TABLE
     player_score
-FIELDS
-    terminated by ','
-    enclosed by '"'
+FIELDS TERMINATED BY ','
 ;
 INSERT INTO latest_player_score (tenant_id, player_id, competition_id, score, row_num, created_at, updated_at)
 SELECT
