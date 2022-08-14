@@ -450,6 +450,9 @@ public class Application {
         }
 
         public Map<String, PlayerRow> findByIds(Set<String> playerIds) {
+            if (playerIds.isEmpty()) {
+                return Collections.emptyMap();
+            }
             List<PlayerRow> players = adminDb.query(
                 "SELECT * FROM player WHERE id IN (:ids)",
                 new MapSqlParameterSource("ids", playerIds),
