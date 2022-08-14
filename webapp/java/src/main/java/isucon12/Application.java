@@ -1385,7 +1385,7 @@ public class Application {
         SELECT tenant_id, player_id, competition_id, score, row_num, created_at, updated_at
         FROM player_score
         WHERE (tenant_id, player_id, competition_id, row_num) = (
-            SELECT DISTINCT tenant_id, player_id, competition_id, MAX(row_num) OVER(PARTITION BY tenant_id, player_id, competition_id)
+            SELECT DISTINCT tenant_id, player_id, competition_id, MAX(row_num) OVER(PARTITION BY player_id)
             FROM player_score
         )
                 """;
